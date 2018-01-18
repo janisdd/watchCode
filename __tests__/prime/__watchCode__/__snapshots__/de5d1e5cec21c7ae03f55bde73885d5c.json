@@ -1,0 +1,10 @@
+{
+  "WatchExpressionFilePath": "src/index.ts",
+  "LineRange": {
+    "Start": 6,
+    "End": 6
+  },
+  "Lines": [
+    "//from https://stackoverflow.com/questions/40200089/is-a-number-prim"
+  ]
+}

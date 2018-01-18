@@ -1,0 +1,20 @@
+[
+  {
+    "WatchExpressionFilePath": "src/index.ts",
+    "LineRange": {
+      "Start": 7,
+      "End": 10
+    }
+  },
+  {
+    "WatchExpressionFilePath": "src/index.ts",
+    "LineRange": {
+      "Start": 6,
+      "End": 6
+    }
+  },
+  {
+    "WatchExpressionFilePath": "src/index.ts",
+    "LineRange": null
+  }
+]
