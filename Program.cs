@@ -26,10 +26,6 @@ namespace watchCode
             //cmdArgs.Init = true;
             //cmdArgs.Update = true;
             cmdArgs.Compare = true;
-            //TODO jsut for testing
-
-            config.ReduceWatchExpressions = false;
-
 
             //some checking 
             BootstrapHelper.Bootstrap(cmdArgs, config);
@@ -179,22 +175,21 @@ namespace watchCode
             var groupedWatchExpressionsByFileName = allWatchExpressions
                 .GroupBy(p => p.GetSnapshotFileNameWithoutExtension(config.CombineSnapshotFiles.Value))
                 .ToList();
-//
-//            /*
-//             * nevertheless we can reduce the amount of watch expression more...
-//             *
-//             * given group X of watch expressions
-//             *     if a line range is included in another watch expressions line range
-//             *     we only need to evaluate the larger range
-//             * 
-//             *     BUT we still need the groups because the user wants to know where
-//             *     he need to update the documentation
-//             *
-//             *     so just iterate through the group and give the result of the largest
-//             *     expressions for every member of the group
-//             *
-//             */
-//
+
+            /*
+             * nevertheless we can reduce the amount of watch expression more...
+             *
+             * given group X of watch expressions
+             *     if a line range is included in another watch expressions line range
+             *     we only need to evaluate the larger range
+             * 
+             *     BUT we still need the groups because the user wants to know where
+             *     he need to update the documentation
+             *
+             *     so just iterate through the group and give the result of the largest
+             *     expressions for every member of the group
+             *
+             */
 
             foreach (var group in groupedWatchExpressionsByFileName)
             {
@@ -204,45 +199,73 @@ namespace watchCode
                     Logger.Log("found empty group of watch expressions ... should not happen, skipping");
                 }
 
-                WatchExpression largestRangeWatchExpression = sameFileNameWatchExpressions.First();
-                int largestRangeWatchExpressionIndex = 0;
-                List<int> indicesToSkip = new List<int>();
+                //TODO maybe reduce intersecting watch expressions...
+                //not 100% sure this is correct...
 
-                //TODO we can have multiple nested regions...
+                //we can have multiple nested regions...
+                //store for every region the largest and the containg expressions
+                var ranks = new List<(WatchExpression largest, List<WatchExpression> containedExpressions)>();
 
-                for (int i = 1; i < sameFileNameWatchExpressions.Count; i++) //already checked i=0
+                //e.g. watch same file lines 6, 7-10, full file 1-11
+                //then we would get two buckets but both has same full file as largest
+
+                //so better sort them first by range
+                //if an expression y would go into bucket x then we know x.start <= y.start
+
+                var orderedSameFileNameWatchExpressions = sameFileNameWatchExpressions
+                        .OrderBy(p => p.LineRange?.Start ?? Int32.MinValue)
+                        .ToList()
+                    ;
+
+                for (int i = 0; i < orderedSameFileNameWatchExpressions.Count; i++) //already checked i=0
                 {
-                    var watchExpression = sameFileNameWatchExpressions[i];
+                    var watchExpression = orderedSameFileNameWatchExpressions[i];
 
-                    if (watchExpression.IncludesOther(largestRangeWatchExpression))
+                    //first needs to be added manually
+                    if (ranks.Count == 0)
                     {
-                        indicesToSkip.Add(largestRangeWatchExpressionIndex);
+                        ranks.Add((watchExpression, new List<WatchExpression>()));
+                        continue;
+                    }
 
-                        //update largest
-                        largestRangeWatchExpression = watchExpression;
-                        largestRangeWatchExpressionIndex = i;
-                    }
-                    else if (largestRangeWatchExpression.IncludesOther(watchExpression))
+                    //check if the watch expression is already included in another
+                    for (int j = 0; j < ranks.Count; j++)
                     {
-                        indicesToSkip.Add(i);
+                        var tuple = ranks[j];
+
+                        if (tuple.largest.IncludesOther(watchExpression))
+                        {
+                            tuple.containedExpressions.Add(watchExpression);
+                        }
+                        else if (watchExpression.IncludesOther(tuple.largest))
+                        {
+                            //found new largest
+                            tuple.containedExpressions.Add(tuple.largest);
+                            tuple.largest = watchExpression;
+                        }
+                        else
+                        {
+                            //create new group becasue distinct or intersect with other groups...
+                            ranks.Add((watchExpression, new List<WatchExpression>()));
+                            break;
+                        }
                     }
-                    //else disjunct or intersecting
                 }
 
                 //we found the largest watch expression..
 
                 //now evaulate all necessary
 
-                for (int i = 0; i < sameFileNameWatchExpressions.Count; i++)
+                foreach (var tuple in ranks)
                 {
-                    if (indicesToSkip.Contains(i)) continue;
-
-                    var watchExpression = sameFileNameWatchExpressions[i];
-
-                    EvaulateSingleWatchExpression(watchExpression, cmdArgs, config,
+                    EvaulateSingleWatchExpression(tuple.largest, cmdArgs, config,
                         snapshotsDictionary, alreadyReadSnapshots, equalMap);
 
-                    //TODO copy results
+                    var snapshotsWereEqual = equalMap[tuple.largest];
+
+                    //copy result to sub line ranges
+                    foreach (var watchExpression in tuple.containedExpressions)
+                        equalMap.Add(watchExpression, snapshotsWereEqual);
                 }
             }
 

@@ -62,7 +62,7 @@
         /// 
         /// </summary>
         /// <param name="y"></param>
-        /// <returns>true: the other y is fully included in this watch expression,
+        /// <returns>true: the other y is fully included in this watch expression (line range wise),
         /// false: not</returns>
         public bool IncludesOther(WatchExpression y)
         {
@@ -70,7 +70,10 @@
             if (WatchExpressionFilePath != y.WatchExpressionFilePath) return false;
 
             //if one matches the whole file then the other is not important
-            if (LineRange == null || y.LineRange == null) return true;
+            if (LineRange == null) return true;
+
+            //here this.LineRange is != null so y is always larger
+            if (y.LineRange == null) return false;
 
             //if a rang includes the ther --> equal
 
@@ -81,14 +84,6 @@
             {
                 return true;
             }
-
-            //range x is included in y range
-            if (y.LineRange.Value.Start <= LineRange.Value.Start &&
-                y.LineRange.Value.End >= LineRange.Value.End)
-            {
-                return true;
-            }
-
 
             return false;
         }
