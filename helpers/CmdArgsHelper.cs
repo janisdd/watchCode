@@ -18,16 +18,23 @@ namespace watchCode.helpers
         private static bool insideNoCombineSnapshots = false;
         private static bool insideNoCompressLines = false;
         private static bool insideHashAlgorithmToUse = false;
+        private static bool insideConfigFileName = false;
 
-        public static CmdArgs ParseArgs(string[] args)
+        public static (CmdArgs, Config) ParseArgs(string[] args)
         {
             var cmdArgs = new CmdArgs();
-
+            var config = Config.DefaultConfig;
 
             foreach (var arg in args)
             {
                 switch (arg)
                 {
+                    case ParameterStart + "rootDir":
+                        ResetInsideArgs();
+                        insideRootDir = true;
+                        continue;
+                        break;
+                        
                     case ParameterStart + "dir":
                     case ParameterStart + "dirs":
                         ResetInsideArgs();
@@ -48,42 +55,12 @@ namespace watchCode.helpers
                         continue;
                         break;
 
-                    case ParameterStart + "dump":
-                        ResetInsideArgs();
-                        insideCreateWatchExpressionsDumpFile = true;
-                        continue;
-                        break;
-
-                    case ParameterStart + "watchDir":
-                        ResetInsideArgs();
-                        insideWatchDir = true;
-                        continue;
-                        break;
-
-                    case ParameterStart + "snapshotDirName":
-                        ResetInsideArgs();
-                        insideSnapshotDirName = true;
-                        continue;
-                        break;
-
-                    case ParameterStart + "dumpName":
-                        ResetInsideArgs();
-                        insideDumpWatchExpressionsFileName = true;
-                        continue;
-                        break;
-
-                    case ParameterStart + "rootDir":
-                        ResetInsideArgs();
-                        insideRootDir = true;
-                        continue;
-                        break;
-
                     case ParameterStart + "noReduce":
                         ResetInsideArgs();
                         insideNoReduce = true;
                         continue;
                         break;
-
+                        
                     case ParameterStart + "noCombineSnapshots":
                         ResetInsideArgs();
                         insideNoCombineSnapshots = true;
@@ -101,25 +78,57 @@ namespace watchCode.helpers
                         insideHashAlgorithmToUse = true;
                         continue;
                         break;
+                        
+                    case ParameterStart + "snapshotDirName":
+                        ResetInsideArgs();
+                        insideSnapshotDirName = true;
+                        continue;
+                        break;
+                        
+                    case ParameterStart + "watchDir":
+                        ResetInsideArgs();
+                        insideWatchDir = true;
+                        continue;
+                        break;
+
+                    case ParameterStart + "dumpExprs":
+                        ResetInsideArgs();
+                        insideCreateWatchExpressionsDumpFile = true;
+                        continue;
+                        break;
+                        
+                    case ParameterStart + "dumpName":
+                        ResetInsideArgs();
+                        insideDumpWatchExpressionsFileName = true;
+                        continue;
+                        break;
+                        
+                    case ParameterStart + "config":
+                        ResetInsideArgs();
+                        insideConfigFileName = true;
+                        continue;
+                        break;
                 }
 
-                if (insideDirs) cmdArgs.Dirs.Add(arg);
-                if (insideFiles) cmdArgs.Files.Add(arg);
+                if (insideDirs) config.Dirs.Add(arg);
+                if (insideFiles) config.Files.Add(arg);
 
-                if (insideRecursiveCheckDirs) cmdArgs.RecursiveCheckDirs = false;
-                if (insideCreateWatchExpressionsDumpFile) cmdArgs.CreateWatchExpressionsDumpFile = true;
-                if (insideWatchDir) cmdArgs.WatchCodeDirName = arg;
-                if (insideSnapshotDirName) cmdArgs.SnapshotDirName = arg;
+                if (insideRecursiveCheckDirs) config.RecursiveCheckDirs = false;
+                if (insideCreateWatchExpressionsDumpFile) config.CreateWatchExpressionsDumpFile = true;
+                if (insideWatchDir) config.WatchCodeDirName = arg;
+                if (insideSnapshotDirName) config.SnapshotDirName = arg;
 
-                if (insideDumpWatchExpressionsFileName) cmdArgs.DumpWatchExpressionsFileName = arg;
-                if (insideRootDir) cmdArgs.RootDir = arg;
-                if (insideNoReduce) cmdArgs.ReduceWatchExpressions = false;
-                if (insideNoCombineSnapshots) cmdArgs.CombineSnapshotFiles = false;
-                if (insideNoCompressLines) cmdArgs.CompressLines = false;
-                if (insideHashAlgorithmToUse) cmdArgs.HashAlgorithmToUse = arg;
+                if (insideDumpWatchExpressionsFileName) config.DumpWatchExpressionsFileName = arg;
+                if (insideRootDir) config.RootDir = arg;
+                if (insideNoReduce) config.ReduceWatchExpressions = false;
+                if (insideNoCombineSnapshots) config.CombineSnapshotFiles = false;
+                if (insideNoCompressLines) config.CompressLines = false;
+                if (insideHashAlgorithmToUse) config.HashAlgorithmToUse = arg;
+                
+                if (insideConfigFileName) cmdArgs.ConfigFileNameWithExtension = arg;
             }
 
-            return cmdArgs;
+            return (cmdArgs, config);
         }
 
 
@@ -137,6 +146,7 @@ namespace watchCode.helpers
             insideNoCombineSnapshots = false;
             insideNoCompressLines = false;
             insideHashAlgorithmToUse = false;
+            insideConfigFileName = false;
         }
     }
 }

@@ -6,7 +6,24 @@
       "End": 10
     },
     "Lines": [
-      "e73762e1d5cf3aaac4adc1271be572f4"
+      "3786af2c32f357ac1a7af996c04db2dc6a438f46b1e137461e9eff4cf2e7217f8c5c2c824cc1d012eef94fd20b1b27f20ce5b3c1296f74d6069d8f41ca1fc237"
+    ]
+  },
+  {
+    "WatchExpressionFilePath": "src/index.ts",
+    "LineRange": {
+      "Start": 6,
+      "End": 6
+    },
+    "Lines": [
+      "cd8b7aba86d1a26a4603cdb8f6c0070316fce1cb2688f80e0ec6a5fd50e15b2fdc07df36784932aa6d886c1e634568e0831333e8ac4e9eb9c5df9523a4f1f36c"
+    ]
+  },
+  {
+    "WatchExpressionFilePath": "src/index.ts",
+    "LineRange": null,
+    "Lines": [
+      "d250319af3f6f635f1d1d6a557737680b358389a5a1d7d3e4cc7121f71aa7ea4adb60b561d07ca4a871843f2ffbb3296e278d631aa2860aee3ff7dece904ca5b"
     ]
   }
 ]

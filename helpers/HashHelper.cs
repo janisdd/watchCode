@@ -11,7 +11,7 @@ namespace watchCode.helpers
         private static readonly SHA256 sha256 = SHA256.Create();
         private static readonly SHA512 sha512 = SHA512.Create();
 
-        private static string DefualtHashAlgorithmName = "sha512";
+        public static readonly string DefaultHashAlgorithmName = "sha512";
 
         private static HashAlgorithm hashAlgo = sha512;
 
@@ -29,7 +29,7 @@ namespace watchCode.helpers
                     hashAlgo = sha512;
                     break;
                 default:
-                    Logger.Error($"unknown hash algorith set, setting to default: {DefualtHashAlgorithmName}");
+                    Logger.Error($"unknown hash algorith set, setting to default: {DefaultHashAlgorithmName}");
                     hashAlgo = sha512;
                     break;
             }
@@ -42,7 +42,7 @@ namespace watchCode.helpers
         }
 
         /// <summary>
-        /// gets the md5 hash of the given file info
+        /// gets the hash of the given file inf
         /// 
         /// <remarks>
         /// TOOD i think this is better for large files because calling
@@ -80,12 +80,14 @@ namespace watchCode.helpers
 
 
         /// <summary>
-        /// we may use another hash algorithm for file name ... to get shorter names
+        /// we may use another hash algorithm for file names ...
+        /// 
         /// </summary>
         /// <param name="fileName"></param>
         /// <returns></returns>
         public static string GetHashForFileName(string fileName)
         {
+            //md5 should be enough for path/file names
             byte[] bytes = Encoding.UTF8.GetBytes(fileName);
             return BitConverter.ToString(md5.ComputeHash(bytes)).Replace("-", "").ToLower();
         }
