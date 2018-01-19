@@ -16,9 +16,9 @@ namespace watchCode.model
         }
 
 
-        public string GetIdentifier()
+        public string GetSnapshotFileNameWithoutExtension(bool combinedSnapshotFiles)
         {
-            //we need this because / is not good as file name
+            if (combinedSnapshotFiles) return WatchExpressionFilePath;
             
             if (LineRange == null)
             {

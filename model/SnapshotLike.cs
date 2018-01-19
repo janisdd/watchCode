@@ -9,6 +9,8 @@
         /// returns a unique identifier based on <see cref="WatchExpressionFilePath"/> and <see cref="LineRange"/>
         /// </summary>
         /// <returns></returns>
-        string GetIdentifier();
+        string GetSnapshotFileNameWithoutExtension(bool combinedSnapshotFiles);
+        
+        
     }
 }

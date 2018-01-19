@@ -1,6 +1,8 @@
 # docs
 
-<!-- @watch src/index.ts 7-10 -->
+<!-- 
+@watch src/index.ts 7-10
+-->
 checks whether the given number is a prime (true) or not (false)
 
 

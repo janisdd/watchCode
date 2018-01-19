@@ -1,39 +1,24 @@
-﻿using watchCode.model;
+﻿using System.Collections.Generic;
+using watchCode.model;
 
 namespace watchCode.helpers
 {
     public static class SnapshotWrapperHelper
     {
-        public static Snapshot CreateSnapshot(WatchExpression watchExpression)
+
+        public static bool prettyPrintSnapshots = true;
+        
+        public static Snapshot CreateSnapshot(WatchExpression watchExpression, bool compressLines)
         {
             //create snapshot
             string path = DynamicConfig.GetAbsoluteFileToWatchPath(watchExpression.WatchExpressionFilePath);
             var snapshot =
-                SnapshotHelper.CreateSnapshot(path, watchExpression.WatchExpressionFilePath, watchExpression.LineRange);
-
+                SnapshotHelper.CreateSnapshot(path, watchExpression, compressLines);
+            
             return snapshot;
         }
-
-        public static bool SaveSnapshot(Snapshot snapshot, CmdArgs cmdArgs)
-        {
-            //save new snapshot
-            string snapshotDirPath = DynamicConfig.GetAbsoluteSnapShotDirPath(cmdArgs);
-            return SnapshotHelper.SaveSnapshot(snapshotDirPath, snapshot, true);
-        }
-
-        public static bool CreateAndSaveSnapshot(WatchExpression watchExpression, CmdArgs cmdArgs)
-        {
-            var snapShot = CreateSnapshot(watchExpression);
-
-            return SaveSnapshot(snapShot, cmdArgs);
-        }
-
-
-        public static Snapshot ReadSnapshot(string absoluteSnapshotPath)
-        {
-            return SnapshotHelper.ReadSnapshot(absoluteSnapshotPath);
-        }
-
+        
+        
         public static bool AreSnapshotsEqual(Snapshot oldSnapshot, Snapshot newSnapshot, bool compareMetaData = true)
         {
             if (oldSnapshot == null || newSnapshot == null) return false;
@@ -67,5 +52,41 @@ namespace watchCode.helpers
 
             return true;
         }
+        
+        
+        //--- for single snapshots / no combine snapshots
+
+        public static bool SaveSnapshot(Snapshot snapshot, CmdArgs cmdArgs)
+        {
+            //save new snapshot
+            string snapshotDirPath = DynamicConfig.GetAbsoluteSnapShotDirPath(cmdArgs);
+            return SnapshotHelper.SaveSnapshot(snapshotDirPath, snapshot, prettyPrintSnapshots);
+        }
+
+        public static bool CreateAndSaveSnapshot(WatchExpression watchExpression, CmdArgs cmdArgs, bool compressLines)
+        {
+            var snapShot = CreateSnapshot(watchExpression, compressLines);
+
+            return SaveSnapshot(snapShot, cmdArgs);
+        }
+
+
+        public static Snapshot ReadSnapshot(string absoluteSnapshotPath)
+        {
+            return SnapshotHelper.ReadSnapshot(absoluteSnapshotPath);
+        }
+        
+        public static List<Snapshot> ReadSnapshots(string absoluteSnapshotPath)
+        {
+            return SnapshotHelper.ReadSnapshots(absoluteSnapshotPath);
+        }
+        
+        
+        public static bool SaveSnapshots(List<Snapshot> snapshots, CmdArgs cmdArgs)
+        {
+            string snapshotDirPath = DynamicConfig.GetAbsoluteSnapShotDirPath(cmdArgs);
+            return SnapshotHelper.SaveSnapshots(snapshotDirPath, snapshots, prettyPrintSnapshots);
+        }
+
     }
 }

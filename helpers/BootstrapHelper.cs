@@ -13,6 +13,8 @@ namespace watchCode.helpers
                 DynamicConfig.AbsoluteRootDirPath = cmdArgs.RootDir;
             }
             
+            HashHelper.SetHashAlgorithm(cmdArgs.HashAlgorithmToUse);
+            
             //check if root dir exists...
 
             try

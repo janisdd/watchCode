@@ -30,7 +30,7 @@ namespace watchCode
 
         public static string GetAbsoluteWatchCodeDirPath(CmdArgs cmdArgs)
         {
-            return Path.Combine(AbsoluteRootDirPath, cmdArgs.WatchCodeDir);
+            return Path.Combine(AbsoluteRootDirPath, cmdArgs.WatchCodeDirName);
         }
 
         public static string GetAbsoluteSnapShotDirPath(CmdArgs cmdArgs)

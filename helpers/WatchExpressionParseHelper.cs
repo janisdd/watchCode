@@ -17,16 +17,14 @@ namespace watchCode.helpers
 
             string fileContent = File.ReadAllText(docFileInfo.FullName);
 
-            List<(string start, string end)> commentPatterns;
-
             if (knownFileExtensionsWithoutExtension.TryGetValue(docFileInfo.Extension.Substring(1),
-                    out commentPatterns) == false)
+                    out var commentPatterns) == false)
             {
-                Logger.Warn($"file extension is unknown, skipping file: {docFileInfo.FullName}");
+                Logger.Info($"file extension is unknown, skipping file: {docFileInfo.FullName}");
                 return new List<WatchExpression>();
             }
 
-            List<string> matchedComments = new List<string>();
+            
 
             foreach (var commentPattern in commentPatterns)
             {
@@ -34,9 +32,21 @@ namespace watchCode.helpers
 
                 for (int i = 0; i < matches.Count; i++)
                 {
-                    var comment = matches[i];
-                    var commentText = comment.Value.Substring(commentPattern.start.Length,
-                            comment.Value.Length - commentPattern.end.Length - commentPattern.start.Length)
+                    var commentMatch = matches[i];
+
+                    var expressionLocation =
+                        GetLineRangeFromIndices(fileContent, commentMatch.Index, commentMatch.Length);
+
+                    if (expressionLocation == null)
+                    {
+                        Logger.Warn(
+                            $"could not get watch expression num: {i + 1} location in doc file: {docFileInfo.FullName}, skipping");
+                        continue;
+                    }
+
+
+                    var commentText = commentMatch.Value.Substring(commentPattern.start.Length,
+                            commentMatch.Value.Length - commentPattern.end.Length - commentPattern.start.Length)
                         .Trim();
 
                     foreach (var watchExpressionKeyword in initWatchExpressionKeywords)
@@ -44,12 +54,12 @@ namespace watchCode.helpers
                         if (commentText.StartsWith(watchExpressionKeyword))
                         {
                             var plainExpressionText = commentText.Substring(watchExpressionKeyword.Length);
-                            var expressions = GetWatchExpressions(plainExpressionText, docFileInfo);
+
+                            var expressions = GetWatchExpressions(plainExpressionText, docFileInfo,
+                                expressionLocation.Value);
                             watchExpressions.AddRange(expressions);
                         }
                     }
-
-                    matchedComments.Add(comment.Value);
                 }
             }
 
@@ -57,8 +67,31 @@ namespace watchCode.helpers
             return watchExpressions;
         }
 
+        private static LineRange? GetLineRangeFromIndices(string text, int startIndex, int length)
+        {
+            int line = 1;
+            int startLine = -1;
+            int endLine = -1;
 
-        private static List<WatchExpression> GetWatchExpressions(string watchExpressionString, FileInfo file)
+            //text[startIndex] is exatcly the first char of the match 
+            for (int i = 0; i < startIndex + length; i++)
+            {
+                if (i == startIndex) startLine = line;
+                if (text[i] == '\n') line++;
+            }
+            //the last one is text[startIndex + length - 1] that is exactly the last char of the match...
+            endLine = line;
+
+            if (startLine < 0 || endLine < 0)
+            {
+                return null;
+            }
+
+            return new LineRange(startLine, endLine);
+        }
+
+        private static List<WatchExpression> GetWatchExpressions(string watchExpressionString, FileInfo fileInfo,
+            LineRange watchExpressionFoundLineRange)
         {
             /*
              * different formats allowed:
@@ -91,7 +124,8 @@ namespace watchCode.helpers
 
             foreach (var expressionString in possibleWatchExpressionStrings)
             {
-                var watchExpresion = ParseSingleWatchExpression(expressionString, file);
+                var watchExpresion =
+                    ParseSingleWatchExpression(expressionString, fileInfo, watchExpressionFoundLineRange);
 
                 if (watchExpresion == null) continue;
 
@@ -102,7 +136,9 @@ namespace watchCode.helpers
             return watchExpressions;
         }
 
-        private static WatchExpression? ParseSingleWatchExpression(string possibleWatchExpression, FileInfo file)
+        
+        private static WatchExpression? ParseSingleWatchExpression(string possibleWatchExpression, FileInfo fileInfo,
+            LineRange watchExpressionFoundLineRange)
         {
             possibleWatchExpression = possibleWatchExpression.Trim();
 
@@ -110,6 +146,10 @@ namespace watchCode.helpers
             bool isReadingPath = true;
 
             StringBuilder builder = new StringBuilder();
+
+            
+            string documentationFileRelativePath = IoHelper.GetRelativePath(fileInfo.FullName, DynamicConfig.AbsoluteRootDirPath);
+
 
             for (int i = 0; i < possibleWatchExpression.Length; i++)
             {
@@ -140,7 +180,7 @@ namespace watchCode.helpers
             {
                 //we found a " without a matching "...
                 Logger.Warn(
-                    $"found orphan \" in the watch expression: {possibleWatchExpression} in file: {file.FullName}, skipping");
+                    $"found orphan \" in the watch expression: {possibleWatchExpression} in file: {fileInfo.FullName}, skipping");
                 return null;
             }
 
@@ -150,7 +190,7 @@ namespace watchCode.helpers
             if (filePath.Length == 0)
             {
                 Logger.Warn(
-                    $"found empty watch expression: {possibleWatchExpression} in file: {file.FullName}, skipping");
+                    $"found empty watch expression: {possibleWatchExpression} in file: {fileInfo.FullName}, skipping");
                 return null;
             }
 
@@ -162,15 +202,15 @@ namespace watchCode.helpers
 
             if (string.IsNullOrWhiteSpace(lineRangString) == false) //we have specific line(s) to watch
             {
-                lineRang = ParseLineRange(lineRangString, file);
+                lineRang = ParseLineRange(lineRangString, fileInfo);
 
                 if (lineRang == null) return null;
             }
 
-            return new WatchExpression(filePath, lineRang);
+            return new WatchExpression(filePath, lineRang, documentationFileRelativePath, watchExpressionFoundLineRange);
         }
 
-        private static LineRange? ParseLineRange(string possibleLineRang, FileInfo file)
+        private static LineRange? ParseLineRange(string possibleLineRang, FileInfo fileInfo)
         {
             possibleLineRang = possibleLineRang.Trim();
 
@@ -186,28 +226,28 @@ namespace watchCode.helpers
                 if (int.TryParse(rangeStrings[0], out start) == false)
                 {
                     Logger.Warn(
-                        $"found invalid line range expression (start value): {possibleLineRang} in file: {file.FullName}, skipping");
+                        $"found invalid line range expression (start value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
                     return null;
                 }
 
                 if (start < 0)
                 {
                     Logger.Warn(
-                        $"found invalid (negative) line range expression (start value): {possibleLineRang} in file: {file.FullName}, skipping");
+                        $"found invalid (negative) line range expression (start value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
                     return null;
                 }
 
                 if (int.TryParse(rangeStrings[1], out end) == false)
                 {
                     Logger.Warn(
-                        $"found invalid line range expression (end value): {possibleLineRang} in file: {file.FullName}, skipping");
+                        $"found invalid line range expression (end value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
                     return null;
                 }
 
                 if (end < 0)
                 {
                     Logger.Warn(
-                        $"found invalid (negative) line range expression (end value): {possibleLineRang} in file: {file.FullName}, skipping");
+                        $"found invalid (negative) line range expression (end value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
                     return null;
                 }
 
@@ -220,14 +260,14 @@ namespace watchCode.helpers
             if (int.TryParse(possibleLineRang, out startAndEnd) == false)
             {
                 Logger.Warn(
-                    $"found invalid line range expression (start value): {possibleLineRang} in file: {file.FullName}, skipping");
+                    $"found invalid line range expression (start value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
                 return null;
             }
 
             if (startAndEnd < 0)
             {
                 Logger.Warn(
-                    $"found invalid (negative) line range expression: {possibleLineRang} in file: {file.FullName}, skipping");
+                    $"found invalid (negative) line range expression: {possibleLineRang} in file: {fileInfo.FullName}, skipping");
                 return null;
             }
 

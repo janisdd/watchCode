@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using System.IO;
+using watchCode.helpers;
 
 namespace watchCode.model
 {
@@ -26,16 +26,36 @@ namespace watchCode.model
         public bool RecursiveCheckDirs { get; set; }
 
         /// <summary>
+        /// true: reduce/compress watch expressions e.g. if one watch expression (line range) is included
+        /// in another, this is faster for evaulating but takes some time for finding the "duplicates"
+        /// false: use all found watch expressions 
+        /// </summary>
+        public bool ReduceWatchExpressions { get; set; }
+
+
+        /// <summary>
+        /// true: combines snapshots of the same file (code file) into one snapshot file
+        /// false: not
+        /// </summary>
+        public bool CombineSnapshotFiles { get; set; }
+        
+        
+        /// <summary>
         /// true: only create a dump file containg all
         /// watch expression discovered inside the dirs/files
         /// </summary>
         public bool CreateWatchExpressionsDumpFile { get; set; }
 
         /// <summary>
-        /// will be created inside <see cref="WatchCodeDir"/>
+        /// will be created inside <see cref="WatchCodeDirName"/>
         /// </summary>
         public string DumpWatchExpressionsFileName { get; set; }
 
+        /// <summary>
+        /// true: use the real lines to compare snapshots
+        /// false: use (md5) hash of the lines
+        /// </summary>
+        public bool CompressLines { get; set; }
         
         /// <summary>
         /// true: creates all snapshots (if not already exist)
@@ -56,15 +76,19 @@ namespace watchCode.model
         public bool Compare { get; set; }
 
 
-
-        
         public bool SilentCompare { get; set; }
 
         
-        public string WatchCodeDir { get; set; }
+        public string WatchCodeDirName { get; set; }
+
+        /// <summary>
+        /// see <see cref="HashHelper.SetHashAlgorithm"/> for supported algorithms
+        /// null or whitespaces for default
+        /// </summary>
+        public string HashAlgorithmToUse { get; set; }
         
         /// <summary>
-        /// relative to <see cref="WatchCodeDir"/>
+        /// relative to <see cref="WatchCodeDirName"/>
         /// </summary>
         public string SnapshotDirName { get; set; }
 
@@ -73,11 +97,16 @@ namespace watchCode.model
             Dirs = new List<string>();
             Files = new List<string>();
 
-            WatchCodeDir = "__watchCode__";
+            WatchCodeDirName = "__watchCode__";
             SnapshotDirName = "__snapshots__";
             DumpWatchExpressionsFileName = "watchExpressions.json";
             CreateWatchExpressionsDumpFile = true;
+            RecursiveCheckDirs = true;
+            ReduceWatchExpressions = true;
+            CombineSnapshotFiles = true;
+            CompressLines = true;
             RootDir = "";
+            HashAlgorithmToUse = "";
 
         }
         
