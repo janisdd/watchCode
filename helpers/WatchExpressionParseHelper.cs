@@ -9,6 +9,8 @@ namespace watchCode.helpers
 {
     public static class WatchExpressionParseHelper
     {
+        public static readonly string CommentContentPattern = $"[\\s\\S\n]*?";
+
         public static List<WatchExpression> GetAllWatchExpressions(FileInfo docFileInfo,
             Dictionary<string, List<(string start, string end)>> knownFileExtensionsWithoutExtension,
             List<string> initWatchExpressionKeywords)
@@ -24,11 +26,11 @@ namespace watchCode.helpers
                 return new List<WatchExpression>();
             }
 
-            
 
             foreach (var commentPattern in commentPatterns)
             {
-                var matches = Regex.Matches(fileContent, $"{commentPattern.start}[\\s\\S\n]*?{commentPattern.end}");
+                var matches = Regex.Matches(fileContent,
+                    $"{commentPattern.start}{CommentContentPattern}{commentPattern.end}");
 
                 for (int i = 0; i < matches.Count; i++)
                 {
@@ -136,7 +138,7 @@ namespace watchCode.helpers
             return watchExpressions;
         }
 
-        
+
         private static WatchExpression? ParseSingleWatchExpression(string possibleWatchExpression, FileInfo fileInfo,
             LineRange watchExpressionFoundLineRange)
         {
@@ -147,8 +149,9 @@ namespace watchCode.helpers
 
             StringBuilder builder = new StringBuilder();
 
-            
-            string documentationFileRelativePath = IoHelper.GetRelativePath(fileInfo.FullName, DynamicConfig.AbsoluteRootDirPath);
+
+            string documentationFileRelativePath =
+                IoHelper.GetRelativePath(fileInfo.FullName, DynamicConfig.AbsoluteRootDirPath);
 
 
             for (int i = 0; i < possibleWatchExpression.Length; i++)
@@ -207,7 +210,8 @@ namespace watchCode.helpers
                 if (lineRang == null) return null;
             }
 
-            return new WatchExpression(filePath, lineRang, documentationFileRelativePath, watchExpressionFoundLineRange);
+            return new WatchExpression(filePath, lineRang, documentationFileRelativePath,
+                watchExpressionFoundLineRange);
         }
 
         private static LineRange? ParseLineRange(string possibleLineRang, FileInfo fileInfo)

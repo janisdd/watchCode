@@ -70,6 +70,8 @@ namespace watchCode.model
         /// </summary>
         public string DumpWatchExpressionsFileName { get; set; }
 
+        
+        public bool AlsoUseReverseLines { get; set; }
 
         //--- not accessible via command line
         
@@ -83,13 +85,17 @@ namespace watchCode.model
         /// </summary>
         public Dictionary<string, List<(string start, string end)>> KnownFileExtensionsWithoutExtension;
 
+        
+        
 
         /// <summary>
         /// checks if every prop has a != null value
+        /// 
+        /// also if some args are set that could not be used with some config options...
         /// </summary>
         /// <param name="config"></param>
         /// <returns></returns>
-        public static bool Validate(Config config)
+        public static bool Validate(Config config, CmdArgs cmdArgs)
         {
             var props = config
                 .GetType()
@@ -124,6 +130,7 @@ namespace watchCode.model
             CompressLines = true,
             RootDir = "",
             HashAlgorithmToUse = HashHelper.DefaultHashAlgorithmName,
+            AlsoUseReverseLines = false,
 
             //null beacuse we want to know if the user put an empty array in config
             InitWatchExpressionKeywords = null,

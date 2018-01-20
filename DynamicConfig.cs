@@ -12,7 +12,6 @@ namespace watchCode
 
         public static List<string> initWatchExpressionKeywords;
 
-
         static DynamicConfig()
         {
             KnownFileExtensionsWithoutExtension = new Dictionary<string, List<(string start, string end)>>();

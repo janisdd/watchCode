@@ -19,6 +19,7 @@ namespace watchCode.helpers
         private static bool insideNoCompressLines = false;
         private static bool insideHashAlgorithmToUse = false;
         private static bool insideConfigFileName = false;
+        private static bool insideAlsoUseReverseLines = false;
 
         public static (CmdArgs, Config) ParseArgs(string[] args)
         {
@@ -103,11 +104,18 @@ namespace watchCode.helpers
                         continue;
                         break;
                         
+                    case ParameterStart + "alsoUseReverseLines":
+                        ResetInsideArgs();
+                        insideAlsoUseReverseLines = true;
+                        continue;
+                        break;
+                        
                     case ParameterStart + "config":
                         ResetInsideArgs();
                         insideConfigFileName = true;
                         continue;
                         break;
+                        
                 }
 
                 if (insideDirs) config.Dirs.Add(arg);
@@ -124,6 +132,7 @@ namespace watchCode.helpers
                 if (insideNoCombineSnapshots) config.CombineSnapshotFiles = false;
                 if (insideNoCompressLines) config.CompressLines = false;
                 if (insideHashAlgorithmToUse) config.HashAlgorithmToUse = arg;
+                if (insideAlsoUseReverseLines) cmdArgs.ConfigFileNameWithExtension = arg;
                 
                 if (insideConfigFileName) cmdArgs.ConfigFileNameWithExtension = arg;
             }
@@ -147,6 +156,7 @@ namespace watchCode.helpers
             insideNoCompressLines = false;
             insideHashAlgorithmToUse = false;
             insideConfigFileName = false;
+            insideAlsoUseReverseLines = false;
         }
     }
 }

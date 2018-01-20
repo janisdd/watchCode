@@ -2,16 +2,10 @@
 {
     public struct WatchExpression : ISnapshotLike
     {
-        /// <summary>
-        /// the file path found in the watch expression
-        /// </summary>
+       
         public string WatchExpressionFilePath { get; set; }
-
-        /// <summary>
-        /// if this is null then we watch the whole file
-        /// </summary>
         public LineRange? LineRange { get; set; }
-
+ 
         /// <summary>
         /// the file path (documentation file) where we found the watch expression
         /// relative the the root directory (so basically the same relative to as the watch expressions)

@@ -7,12 +7,55 @@ namespace watchCode.helpers
     {
         public static bool prettyPrintSnapshots = true;
 
-        public static Snapshot CreateSnapshot(WatchExpression watchExpression, bool compressLines)
+        public static Snapshot CreateSnapshot(WatchExpression watchExpression, bool compressLines,
+            bool alsoUseReverseLines)
         {
             //create snapshot
             string path = DynamicConfig.GetAbsoluteFileToWatchPath(watchExpression.WatchExpressionFilePath);
             var snapshot =
-                SnapshotHelper.CreateSnapshot(path, watchExpression, compressLines);
+                SnapshotHelper.CreateSnapshot(path, watchExpression, compressLines, alsoUseReverseLines);
+
+            return snapshot;
+        }
+
+
+        public static Snapshot CreateSnapshotBasedOnOldSnapshotWithIndices(WatchExpression watchExpression,
+            bool compressLines,
+            Snapshot oldSnapshot, bool alsoUseReverseLines)
+        {
+            //create snapshot
+            string path = DynamicConfig.GetAbsoluteFileToWatchPath(watchExpression.WatchExpressionFilePath);
+
+            if (watchExpression.LineRange == null)
+            {
+                //we need to read the whole file so no difference using stream indices...
+                return SnapshotHelper.CreateSnapshot(path, watchExpression, compressLines, alsoUseReverseLines);
+            }
+
+            var snapshot =
+                SnapshotHelper.CreateSnapshotBasedOnOldSnapshotWithIndices(path, watchExpression, compressLines,
+                    oldSnapshot);
+
+            return snapshot;
+        }
+
+
+        public static Snapshot CreateSnapshotBasedOnOldSnapshot(WatchExpression watchExpression, bool compressLines,
+            Snapshot oldSnapshot, bool alsoUseReverseLines)
+        {
+            //create snapshot
+            string path = DynamicConfig.GetAbsoluteFileToWatchPath(watchExpression.WatchExpressionFilePath);
+
+            if (watchExpression.LineRange == null || alsoUseReverseLines == false)
+            {
+                //we need to read the whole file so no difference using stream indices...
+                //or we don't check from bottom so CreateSnapshotBasedOnOldSnapshot would do the same as CreateSnapshot
+                return SnapshotHelper.CreateSnapshot(path, watchExpression, compressLines, alsoUseReverseLines);
+            }
+
+
+            var snapshot =
+                SnapshotHelper.CreateSnapshotBasedOnOldSnapshot(path, watchExpression, compressLines, oldSnapshot);
 
             return snapshot;
         }
@@ -63,9 +106,9 @@ namespace watchCode.helpers
         }
 
         public static bool CreateAndSaveSnapshot(WatchExpression watchExpression, string watchCodeDirName,
-            string snapshotDirName, bool compressLines)
+            string snapshotDirName, bool compressLines, bool alsoUseReverseLines)
         {
-            var snapShot = CreateSnapshot(watchExpression, compressLines);
+            var snapShot = CreateSnapshot(watchExpression, compressLines, alsoUseReverseLines);
 
             return SaveSnapshot(snapShot, watchCodeDirName, snapshotDirName);
         }

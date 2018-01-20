@@ -27,6 +27,11 @@
             return !(lr1 == lr2);
         }
 
+        public int GetLength()
+        {
+            return End - Start + 1; //e.g. 2-5 = 4 lines
+        }
+        
         public override string ToString()
         {
             return Start + "-" + End;
