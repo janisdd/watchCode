@@ -30,17 +30,12 @@ namespace watchCode
         public static int Run(CmdArgs cmdArgs, Config config)
         {
             int returnCode = OkReturnCode;
-            //TODO
-            //reduce and alsoUseReverseLines don't work togethere
-            //because reducing will take one compare for the whole file and copy results
-            //even if bottom offset would be ok
-
             //some checking 
             BootstrapHelper.Bootstrap(cmdArgs, config);
 
             //cmdArgs.Init = true;
-//            cmdArgs.Update = true;
-            cmdArgs.Compare = true;
+            cmdArgs.Update = true;
+//            cmdArgs.Compare = true;
 
             //after updating docs all bottom to top snapshots are invalid (ranges)
             //after the docs update we don't know which snapshot belongs to which doc watch expression...
@@ -362,7 +357,7 @@ namespace watchCode
                                 (newSnapshot, watchExpression)
                             });
                     }
-                    else
+                    else // newSnapshot == null
                     {
                         //error already produced in CreateSnapshot
                         return;

@@ -177,6 +177,42 @@ namespace watchCode.helpers
             if (watchExpression.LineRange != null && alsoUseReverseLines)
                 newSnapshot.SetReverseLineRange(reversedLineRange, count);
 
+            if (newSnapshot.LineRange != null && newSnapshot.LineRange.Value.End > newSnapshot.TotalLines)
+            {
+                Logger.Warn($"watch expression at: {watchExpression.GetDocumentationLocation()} has " +
+                            $"too large line range, watched file: {watchExpression.WatchExpressionFilePath} " +
+                            $"has actually only {newSnapshot.TotalLines} lines in total");
+                
+                Logger.Warn($"update {watchExpression.GetDocumentationLocation()} to a valid line range: " +
+                            $"something between 1-{newSnapshot.TotalLines} and consider running init/update");
+                
+                return null;
+            }
+            
+            if (newSnapshot.LineRange != null)
+            {
+                if (newSnapshot.LineRange.Value.Start <= 0)
+                {
+                    Logger.Warn($"watch expression start line range at: {watchExpression.GetDocumentationLocation()} " +
+                                $"has < 1 value which is invalid, must be >= 1");
+                    return null;
+                }
+                
+                if (newSnapshot.LineRange.Value.End <= 0)
+                {
+                    Logger.Warn($"watch expression end line range at: {watchExpression.GetDocumentationLocation()} " +
+                                $"has < 1 value which is invalid, must be >= 1");
+                    return null;
+                }
+                
+                if (newSnapshot.LineRange.Value.End < newSnapshot.LineRange.Value.Start)
+                {
+                    Logger.Warn($"watch expression line range at: {watchExpression.GetDocumentationLocation()} " +
+                                $"has a larger end line number than start line number");
+                }
+                
+            }
+
             return newSnapshot;
         }
 
@@ -191,14 +227,61 @@ namespace watchCode.helpers
 
             #region --- some checks
 
+
+            if (oldSnapshot == null)
+            {
+                Logger.Error($"tried to create a snapshot based on a null snapshot, call " +
+                             $"{nameof(SnapshotHelper.CreateSnapshot)} instead, skipping");
+                return null;
+            }
+            
             if (watchExpression.LineRange == null)
             {
-                Logger.Error($"tried to create a snapshot based on an old one but for the whole file, use " +
-                             $"{nameof(SnapshotHelper.CreateSnapshot)} instead, exitting");
-                Environment.Exit(Program.ErrorReturnCode);
+                Logger.Error($"tried to create a snapshot based on an old one but for the whole file, call " +
+                             $"{nameof(SnapshotHelper.CreateSnapshot)} instead, skipping");
                 return null;
             }
 
+            if (oldSnapshot.LineRange != null && oldSnapshot.LineRange.Value.End > oldSnapshot.TotalLines)
+            {
+                Logger.Warn($"watch expression at: {watchExpression.GetDocumentationLocation()} has " +
+                            $"too large line range, watched file: {watchExpression.WatchExpressionFilePath} " +
+                            $"has actually only {oldSnapshot.TotalLines} lines in total");
+                
+                Logger.Warn($"update {watchExpression.GetDocumentationLocation()} to a valid line range: " +
+                            $"something between 1-{oldSnapshot.TotalLines} consider running init/update" +
+                            $"because the old snapshot has the wrong range stored");
+                
+                return null;
+            }
+
+            if (oldSnapshot.LineRange != null && oldSnapshot.LineRange.Value.End < oldSnapshot.LineRange.Value.Start)
+            {
+                Logger.Warn($"watch expression line range at: {watchExpression.GetDocumentationLocation()} " +
+                            $"has a larger end line number than start line number");
+            }
+
+            if (oldSnapshot.LineRange == null)
+            {
+                Logger.Error($"tried to create a snapshot based on an invalid range (null), call " +
+                             $"{nameof(SnapshotHelper.CreateSnapshot)} instead, skipping");
+                return null;
+            }
+            
+            if (oldSnapshot.LineRange.Value.Start <= 0)
+            {
+                Logger.Warn($"watch expression start line range at: {watchExpression.GetDocumentationLocation()} " +
+                            $"has < 1 value which is invalid, must be >= 1");
+                return null;
+            }
+            
+            if (oldSnapshot.LineRange.Value.End <= 0)
+            {
+                Logger.Warn($"watch expression end line range at: {watchExpression.GetDocumentationLocation()} " +
+                            $"has < 1 value which is invalid, must be >= 1");
+                return null;
+            }
+            
             if (watchExpression.LineRange.Value.Start <= 0 || watchExpression.LineRange.Value.End <= 0 ||
                 watchExpression.LineRange.Value.End < watchExpression.LineRange.Value.Start)
             {

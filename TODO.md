@@ -1,19 +1,26 @@
 # TODO
 
-- check different encodings... of src file
 
+- real outputs (& with colors) not only log...
 
-- allow multiple line range expressions for one path @watch [path] [int], [int]-[int], [path]
-
-- log level
-- dump log
+- print help
 
 - statistics flag
 
+- log level
+
+- dump log
+
+
+
 - reduce expressions if y includes x and x changed --> y changed! but if x does not change we don't know for y
 
-- what if range out of file lines?
+- maybe: allow [int]- interval --> until file end
+- maybe: somehow handle (automatically) if end of interval is bigger than total lines in file (now: output warning, ignore)
+  - would involve updating doc files... which is critical
 
+- make readme
+- check different encodings... of src file
 
 ### if you are creazy
 
