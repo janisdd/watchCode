@@ -132,7 +132,7 @@ namespace watchCode.helpers
                 if (insideNoCombineSnapshots) config.CombineSnapshotFiles = false;
                 if (insideNoCompressLines) config.CompressLines = false;
                 if (insideHashAlgorithmToUse) config.HashAlgorithmToUse = arg;
-                if (insideAlsoUseReverseLines) cmdArgs.ConfigFileNameWithExtension = arg;
+                if (insideAlsoUseReverseLines) config.AlsoUseReverseLines = true;
                 
                 if (insideConfigFileName) cmdArgs.ConfigFileNameWithExtension = arg;
             }

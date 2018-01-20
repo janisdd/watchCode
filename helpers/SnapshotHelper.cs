@@ -425,6 +425,7 @@ namespace watchCode.helpers
         //this might be faster (even with reflection?)
         // but don't work if we change/add lines before & after the watched region... 
         //because we use fixed indices they change even if text is inserted in old lines...
+        [Obsolete("see comment")]
         public static Snapshot CreateSnapshotBasedOnOldSnapshotWithIndices(string absoluteFilePath,
             WatchExpression watchExpression,
             bool compressLines, Snapshot oldSnapshot)
@@ -631,6 +632,7 @@ namespace watchCode.helpers
         /// </summary>
         /// <param name="buff"></param>
         /// <param name="builder"></param>
+        [Obsolete("because of CreateSnapshotBasedOnOldSnapshotWithIndices also obsolete")]
         private static void GetTextFromBuffer(char[] buff, StringBuilder builder)
         {
             //now remove the new line chars...
@@ -669,6 +671,7 @@ namespace watchCode.helpers
         /// <param name="buff"></param>
         /// <param name="lines"></param>
         /// <param name="builder"></param>
+        [Obsolete("because of CreateSnapshotBasedOnOldSnapshotWithIndices also obsolete")]
         private static void GetLinesFromBuffer(char[] buff, List<string> lines, StringBuilder builder)
         {
             //now remove the new line chars... and take lines

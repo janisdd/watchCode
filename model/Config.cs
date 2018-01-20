@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using watchCode.helpers;
@@ -28,6 +29,7 @@ namespace watchCode.model
         /// in another, this is faster for evaulating but takes some time for finding the "duplicates"
         /// false: use all found watch expressions 
         /// </summary>
+        [Obsolete("not working")]
         public bool? ReduceWatchExpressions { get; set; }
 
 
@@ -125,7 +127,7 @@ namespace watchCode.model
             DumpWatchExpressionsFileName = "watchExpressions.json",
             CreateWatchExpressionsDumpFile = true,
             RecursiveCheckDirs = true,
-            ReduceWatchExpressions = true,
+            ReduceWatchExpressions = false,
             CombineSnapshotFiles = true,
             CompressLines = true,
             RootDir = "",

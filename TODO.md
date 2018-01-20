@@ -10,6 +10,8 @@
 
 - statistics flag
 
+- reduce expressions if y includes x and x changed --> y changed! but if x does not change we don't know for y
+
 
 ### if you are creazy
 

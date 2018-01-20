@@ -22,6 +22,12 @@ namespace watchCode
 
             var (cmdArgs, config) = CmdArgsHelper.ParseArgs(args);
 
+            return Run(cmdArgs, config);
+        }
+
+
+        public static int Run(CmdArgs cmdArgs, Config config)
+        {
             //TODO
             //reduce and alsoUseReverseLines don't work togethere
             //because reducing will take one compare for the whole file and copy results
@@ -33,10 +39,9 @@ namespace watchCode
             //cmdArgs.Init = true;
 //            cmdArgs.Update = true;
             cmdArgs.Compare = true;
-            
-            config.ReduceWatchExpressions = true;
+
             config.AlsoUseReverseLines = false;
-            
+
             config.CompressLines = false;
 
 
@@ -114,7 +119,6 @@ namespace watchCode
 
             return OkReturnCode;
         }
-
 
         private static void NoReduceWatchExpressionsRun(List<WatchExpression> allWatchExpressions, CmdArgs cmdArgs,
             Config config,

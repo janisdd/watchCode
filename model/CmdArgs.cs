@@ -36,8 +36,11 @@ namespace watchCode.model
         /// </summary>
         public bool Compare { get; set; }
 
-
-        public bool SilentCompare { get; set; }
+        /// <summary>
+        /// true: updates the doc file watch expression if the watched lines change
+        /// but bottom to top searching found the right lines 
+        /// </summary>
+        public bool CompareAndUpdateDocs { get; set; }
 
         
         #endregion
