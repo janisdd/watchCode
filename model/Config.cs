@@ -77,7 +77,7 @@ namespace watchCode.model
         public string DumpWatchExpressionsFileName { get; set; }
 
 
-        public bool AlsoUseReverseLines { get; set; }
+        public bool? AlsoUseReverseLines { get; set; }
 
         
         /// <summary>
@@ -86,7 +86,7 @@ namespace watchCode.model
         /// also when using a temp file the original doc file will be deleted and the temp file will
         /// be moved to the doc file location (so this removes all file attributes...) TODO maybe
         /// </summary>
-        public bool UseInMemoryStringBuilderFileForUpdateingDocs { get; set; }
+        public bool? UseInMemoryStringBuilderFileForUpdateingDocs { get; set; }
 
         //--- not accessible via command line
 

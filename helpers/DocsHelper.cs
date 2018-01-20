@@ -9,8 +9,6 @@ namespace watchCode.helpers
 {
     public static class DocsHelper
     {
-        
-        
         /// <summary>
         /// 
         /// <remarks>
@@ -25,17 +23,16 @@ namespace watchCode.helpers
         /// <param name="config"></param>
         /// <returns></returns>
         public static bool UpdateWatchExpressionInDocFile(
-            List<(WatchExpression watchExpression, Snapshot snapshot)> watchExpressions,
+            List<(WatchExpression watchExpression, bool wasEqual, Snapshot snapshot)> watchExpressions,
             Dictionary<string, List<(string start, string end)>> knownFileExtensionsWithoutExtension,
             List<string> initWatchExpressionKeywords,
             Config config)
         {
-            
-           var linesBuilder = new StringBuilder();
+            var linesBuilder = new StringBuilder();
 
             if (watchExpressions.Count == 0) return true;
 
-            var firstWatchExpression = watchExpressions.First().watchExpression;
+            var firstWatchExpressionInDocPosition = watchExpressions.First().watchExpression;
 
 
             #region -- some checks
@@ -44,15 +41,15 @@ namespace watchCode.helpers
             for (int i = 1; i < watchExpressions.Count; i++)
             {
                 if (watchExpressions[i].watchExpression.DocumentationFilePath !=
-                    firstWatchExpression.DocumentationFilePath ||
+                    firstWatchExpressionInDocPosition.DocumentationFilePath ||
                     watchExpressions[i].watchExpression.DocumentationLineRange !=
-                    firstWatchExpression.DocumentationLineRange)
+                    firstWatchExpressionInDocPosition.DocumentationLineRange)
                 {
                     //these are in different files...
                     Logger.Error($"found wrong grouped watch expressions (same group but not for the same file " +
                                  $"or position)," +
                                  $"found: {watchExpressions[i].watchExpression.DocumentationFilePath}, expected: " +
-                                 $"{firstWatchExpression.DocumentationFilePath}, skipping group");
+                                 $"{firstWatchExpressionInDocPosition.DocumentationFilePath}, skipping group");
 
                     return false;
                 }
@@ -65,7 +62,8 @@ namespace watchCode.helpers
                 return false;
 
             FileInfo fileInfo;
-            string absoluteFilePath = DynamicConfig.GetAbsoluteFilePath(firstWatchExpression.DocumentationFilePath);
+            string absoluteFilePath =
+                DynamicConfig.GetAbsoluteFilePath(firstWatchExpressionInDocPosition.DocumentationFilePath);
 
 
             try
@@ -75,7 +73,7 @@ namespace watchCode.helpers
                 if (fileInfo.Exists == false)
                 {
                     Logger.Error($"could not update watch expression in " +
-                                 $"file: {firstWatchExpression.GetDocumentationLocation()} because file does not exists, " +
+                                 $"file: {firstWatchExpressionInDocPosition.GetDocumentationLocation()} because file does not exists, " +
                                  $"skipping");
 
                     return false;
@@ -85,7 +83,7 @@ namespace watchCode.helpers
             {
                 Logger.Error(
                     $"could not access (to update) watch expression in file: " +
-                    $"{firstWatchExpression.GetDocumentationLocation()}, " +
+                    $"{firstWatchExpressionInDocPosition.GetDocumentationLocation()}, " +
                     $"error: {e.Message}, skipping");
                 return false;
             }
@@ -93,7 +91,7 @@ namespace watchCode.helpers
             if (string.IsNullOrWhiteSpace(fileInfo.Extension))
             {
                 Logger.Error($"no file extension for watch expression in " +
-                             $"file: {firstWatchExpression.GetDocumentationLocation()}, cannot update watch expression, " +
+                             $"file: {firstWatchExpressionInDocPosition.GetDocumentationLocation()}, cannot update watch expression, " +
                              $"skipping");
                 return false;
             }
@@ -102,7 +100,7 @@ namespace watchCode.helpers
                     out var tuples) == false)
             {
                 Logger.Error($"unknown file extension for watch expression in " +
-                             $"file: {firstWatchExpression.GetDocumentationLocation()}, cannot update watch expression, " +
+                             $"file: {firstWatchExpressionInDocPosition.GetDocumentationLocation()}, cannot update watch expression, " +
                              $"skipping");
                 return false;
             }
@@ -111,7 +109,7 @@ namespace watchCode.helpers
             {
                 Logger.Error($"no comment syntax for file extension {fileInfo.Extension.Substring(1)} found, " +
                              $"cannot update watch expression in " +
-                             $"file: {firstWatchExpression.GetDocumentationLocation()}, skipping");
+                             $"file: {firstWatchExpressionInDocPosition.GetDocumentationLocation()}, skipping");
                 return false;
             }
 
@@ -119,7 +117,7 @@ namespace watchCode.helpers
             if (initWatchExpressionKeywords.Count == 0)
             {
                 Logger.Error($"no init watch expression found, cannot update watch expression in" +
-                             $"file: {firstWatchExpression.GetDocumentationLocation()}" +
+                             $"file: {firstWatchExpressionInDocPosition.GetDocumentationLocation()}" +
                              $"skipping");
                 return false;
             }
@@ -139,23 +137,64 @@ namespace watchCode.helpers
             builder.Append(" ");
             builder.Append(initWatchExpressionString);
             builder.Append(" ");
-            builder.Append(firstWatchExpression.WatchExpressionFilePath);
-            builder.Append(" ");
 
-            for (var i = 0; i < watchExpressions.Count; i++)
+            //in one doc location there could be many watch expressions
+            //any every watch expression could watch another file...
+
+            var targetSourceFileGroups = watchExpressions
+                .GroupBy(p => p.watchExpression.WatchExpressionFilePath)
+                .ToList();
+
+            int writtenLinesCount = 1;
+            int possibleLinesToWriteComment = firstWatchExpressionInDocPosition.DocumentationLineRange.GetLength();
+
+            for (var i = 0; i < targetSourceFileGroups.Count; i++)
             {
-                var watchExpressionAndSnapshotTuple = watchExpressions[i];
-                var lineRange = GetNewLineRange(watchExpressionAndSnapshotTuple.watchExpression,
-                    watchExpressionAndSnapshotTuple.snapshot);
+                //now we have all expressions that watch the same source code file
+                var watchExpressionAndSnapshotTuple = targetSourceFileGroups[i].ToList();
 
-                if (i == 0)
+                //now all ranges for this source file
+
+                for (int j = 0; j < watchExpressionAndSnapshotTuple.Count; j++)
                 {
-                    builder.Append(lineRange.ToShortString());
-                    continue;
-                }
+                    var tuple = watchExpressionAndSnapshotTuple[j];
+                    if (j == 0)
+                    {
+                        if (i != 0)
+                        {
+                            builder.Append(", ");
+                            // ReSharper disable once PossibleInvalidOperationException
+                            if (writtenLinesCount < possibleLinesToWriteComment)
+                            {
+                                builder.AppendLine();
+                                writtenLinesCount++;
+                            }
+                        }
 
-                builder.Append(lineRange.ToShortString());
-                builder.Append(", ");
+
+                        builder.Append(tuple.watchExpression.WatchExpressionFilePath);
+                        builder.Append(" ");
+
+                        // ReSharper disable once PossibleInvalidOperationException
+                        builder.Append(
+                            tuple.wasEqual && tuple.snapshot.UsedBottomOffset //if not take old range
+                                ? GetNewLineRange(tuple.watchExpression, tuple.snapshot).ToShortString()
+                                : tuple.watchExpression.LineRange.Value.ToShortString()
+                        );
+
+                        continue;
+                    }
+
+                    var lineRange = GetNewLineRange(tuple.watchExpression, tuple.snapshot);
+                    builder.Append(", ");
+
+                    // ReSharper disable once PossibleInvalidOperationException
+                    builder.Append(
+                        tuple.wasEqual && tuple.snapshot.UsedBottomOffset //if not take old range
+                            ? GetNewLineRange(tuple.watchExpression, tuple.snapshot).ToShortString()
+                            : tuple.watchExpression.LineRange.Value.ToShortString()
+                    );
+                }
             }
 
             builder.Append(" ");
@@ -181,24 +220,33 @@ namespace watchCode.helpers
                     {
                         //we checked before
                         // ReSharper disable once PossibleInvalidOperationException
-                        if (count >= firstWatchExpression.DocumentationLineRange.Start &&
-                            count <= firstWatchExpression.DocumentationLineRange.End)
+                        if (count >= firstWatchExpressionInDocPosition.DocumentationLineRange.Start &&
+                            count <= firstWatchExpressionInDocPosition.DocumentationLineRange.End)
                         {
                             if (wroteComment)
                             {
-                                //if we change the total lines of the doc file all other ranges will become invalid...
-                                if (config.UseInMemoryStringBuilderFileForUpdateingDocs)
+                                if (writtenLinesCount - 1 > 0) //-1 because we already need to write at least 1 line
                                 {
-                                    linesBuilder.AppendLine("");
+                                    //skipt the amount of lines we added
+                                    writtenLinesCount--;
                                 }
                                 else
                                 {
-                                    sw.WriteLine();
+                                    //if we change the total lines of the doc file all other ranges will become invalid...
+                                    if (config.UseInMemoryStringBuilderFileForUpdateingDocs.Value)
+                                    {
+                                        linesBuilder.AppendLine("");
+                                    }
+                                    else
+                                    {
+                                        sw.WriteLine();
+                                    }
                                 }
+                               
                             }
                             else
                             {
-                                if (config.UseInMemoryStringBuilderFileForUpdateingDocs)
+                                if (config.UseInMemoryStringBuilderFileForUpdateingDocs.Value)
                                 {
                                     linesBuilder.AppendLine(newWatchExpressionLine);
                                 }
@@ -211,7 +259,7 @@ namespace watchCode.helpers
                         }
                         else
                         {
-                            if (config.UseInMemoryStringBuilderFileForUpdateingDocs)
+                            if (config.UseInMemoryStringBuilderFileForUpdateingDocs.Value)
                             {
                                 linesBuilder.AppendLine(line);
                             }
@@ -225,7 +273,7 @@ namespace watchCode.helpers
                     }
                 }
 
-                if (config.UseInMemoryStringBuilderFileForUpdateingDocs)
+                if (config.UseInMemoryStringBuilderFileForUpdateingDocs.Value)
                 {
                     //just overwrite the file
                     using (var streamWriter =
@@ -241,17 +289,16 @@ namespace watchCode.helpers
                     fileInfo.Refresh();
                     File.Delete(fileInfo.FullName);
                     File.Move(absoluteTempFilePath, fileInfo.FullName);
-                    
+
 //                    not sure about this ... do we need to set the creation time / last accessed time?
 //                    var newFileInfo = new FileInfo(fileInfo.FullName);
 //                    newFileInfo.Attributes = fileInfo.Attributes;
-
                 }
             }
             catch (Exception e)
             {
                 Logger.Error(
-                    $"could not update watch expression in file: {firstWatchExpression.GetDocumentationLocation()}, " +
+                    $"could not update watch expression in file: {firstWatchExpressionInDocPosition.GetDocumentationLocation()}, " +
                     $"error: {e.Message}, skipping");
                 return false;
             }

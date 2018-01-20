@@ -236,7 +236,7 @@ namespace watchCode.helpers
                 watchExpressionFoundLineRange);
         }
 
-        private static LineRange? ParseLineRange(string possibleLineRang, FileInfo fileInfo, bool supressWarnings)
+        private static LineRange? ParseLineRange(string possibleLineRang, FileInfo fileInfo, bool suppressWarnings)
         {
             possibleLineRang = possibleLineRang.Trim();
 
@@ -249,9 +249,18 @@ namespace watchCode.helpers
                 int start;
                 int end;
 
+                if (rangeStrings.Length != 2)
+                {
+                    if (suppressWarnings == false)
+                        Logger.Warn(
+                            $"found invalid line range expression (too many/too few values): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
+
+                    return null;
+                }
+
                 if (int.TryParse(rangeStrings[0], out start) == false)
                 {
-                    if (supressWarnings == false)
+                    if (suppressWarnings == false)
                         Logger.Warn(
                             $"found invalid line range expression (start value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
 
@@ -260,7 +269,7 @@ namespace watchCode.helpers
 
                 if (start < 0)
                 {
-                    if (supressWarnings == false)
+                    if (suppressWarnings == false)
                         Logger.Warn(
                             $"found invalid (negative) line range expression (start value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
 
@@ -269,7 +278,7 @@ namespace watchCode.helpers
 
                 if (int.TryParse(rangeStrings[1], out end) == false)
                 {
-                    if (supressWarnings == false)
+                    if (suppressWarnings == false)
                         Logger.Warn(
                             $"found invalid line range expression (end value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
 
@@ -278,7 +287,7 @@ namespace watchCode.helpers
 
                 if (end < 0)
                 {
-                    if (supressWarnings == false)
+                    if (suppressWarnings == false)
                         Logger.Warn(
                             $"found invalid (negative) line range expression (end value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
 
@@ -293,15 +302,19 @@ namespace watchCode.helpers
 
             if (int.TryParse(possibleLineRang, out startAndEnd) == false)
             {
+                if (suppressWarnings == false)
                 Logger.Warn(
-                    $"found invalid line range expression (start value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
+                    $"found invalid line (< 0) range expression (start value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
+                
                 return null;
             }
 
             if (startAndEnd < 0)
             {
+                if (suppressWarnings == false)
                 Logger.Warn(
-                    $"found invalid (negative) line range expression: {possibleLineRang} in file: {fileInfo.FullName}, skipping");
+                    $"found invalid (< 0) line range expression: {possibleLineRang} in file: {fileInfo.FullName}, skipping");
+                
                 return null;
             }
 

@@ -2,25 +2,49 @@
   {
     "WatchExpressionFilePath": "src/index.ts",
     "LineRange": {
-      "Start": 9,
-      "End": 12
+      "Start": 7,
+      "End": 10
     },
     "DocumentationFilePath": "docs/doc.md",
     "DocumentationLineRange": {
       "Start": 3,
-      "End": 3
+      "End": 4
+    }
+  },
+  {
+    "WatchExpressionFilePath": "src/index2.ts",
+    "LineRange": {
+      "Start": 8,
+      "End": 9
+    },
+    "DocumentationFilePath": "docs/doc.md",
+    "DocumentationLineRange": {
+      "Start": 3,
+      "End": 4
+    }
+  },
+  {
+    "WatchExpressionFilePath": "src/index2.ts",
+    "LineRange": {
+      "Start": 7,
+      "End": 10
+    },
+    "DocumentationFilePath": "docs/doc.md",
+    "DocumentationLineRange": {
+      "Start": 3,
+      "End": 4
     }
   },
   {
     "WatchExpressionFilePath": "src/index.ts",
     "LineRange": {
-      "Start": 8,
-      "End": 8
+      "Start": 1,
+      "End": 1
     },
     "DocumentationFilePath": "docs/doc.md",
     "DocumentationLineRange": {
-      "Start": 9,
-      "End": 9
+      "Start": 8,
+      "End": 8
     }
   },
   {
@@ -28,8 +52,8 @@
     "LineRange": null,
     "DocumentationFilePath": "docs/doc.md",
     "DocumentationLineRange": {
-      "Start": 14,
-      "End": 14
+      "Start": 13,
+      "End": 13
     }
   }
 ]

@@ -2,10 +2,9 @@
 {
     public struct WatchExpression : ISnapshotLike
     {
-       
         public string WatchExpressionFilePath { get; set; }
         public LineRange? LineRange { get; set; }
- 
+
         /// <summary>
         /// the file path (documentation file) where we found the watch expression
         /// relative the the root directory (so basically the same relative to as the watch expressions)
@@ -16,41 +15,34 @@
         /// the lines where the watch expression was found
         /// </summary>
         public LineRange DocumentationLineRange { get; set; }
-        
 
-        public WatchExpression(string watchExpressionFilePath, LineRange? lineRange, string documentationFilePath, LineRange documentationLineRange)
+
+        public WatchExpression(string watchExpressionFilePath, LineRange? lineRange, string documentationFilePath,
+            LineRange documentationLineRange)
         {
             WatchExpressionFilePath = watchExpressionFilePath;
             LineRange = lineRange;
             DocumentationFilePath = documentationFilePath;
             DocumentationLineRange = documentationLineRange;
         }
-        
+
         /// <summary>
         /// used to determ the file name for the snapshot
         /// </summary>
         /// <returns></returns>
         public string GetSnapshotFileNameWithoutExtension(bool combinedSnapshotFiles)
         {
-            if (combinedSnapshotFiles)  return WatchExpressionFilePath;
-            
+            if (combinedSnapshotFiles) return WatchExpressionFilePath;
+
             if (LineRange == null)
             {
                 return WatchExpressionFilePath;
             }
-            
-            return WatchExpressionFilePath + "_" + LineRange.Value.Start + "-" + LineRange.Value.End;
-        }
-        
-        public string GetFullIdentifier()
-        {
-            if (LineRange == null)
-            {
-                return WatchExpressionFilePath;
-            }
+
             return WatchExpressionFilePath + "_" + LineRange.Value.Start + "-" + LineRange.Value.End;
         }
 
+ 
 
         /// <summary>
         /// 
@@ -91,7 +83,19 @@
             return WatchExpressionFilePath + ", " + LineRange.Value.Start + "-" + LineRange.Value.End;
         }
 
-        public  string GetDocumentationLocation()
+        public string GetFullIdentifier()
+        {
+            if (LineRange == null)
+            {
+                return DocumentationFilePath + ", " + DocumentationLineRange.Start + "-" + DocumentationLineRange.End +
+                       "_" + WatchExpressionFilePath;
+            }
+            return DocumentationFilePath + ", " + DocumentationLineRange.Start + "-" + DocumentationLineRange.End +
+                   "_" + WatchExpressionFilePath + ", " + LineRange.Value.Start + "-" + LineRange.Value.End;
+            ;
+        }
+
+        public string GetDocumentationLocation()
         {
             return DocumentationFilePath + ", " + DocumentationLineRange.Start + "-" + DocumentationLineRange.End;
         }

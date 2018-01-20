@@ -1,0 +1,36 @@
+[
+  {
+    "WatchExpressionFilePath": "src/index2.ts",
+    "LineRange": {
+      "Start": 8,
+      "End": 9
+    },
+    "ReversedLineRange": {
+      "Start": 3,
+      "End": 4
+    },
+    "Lines": [
+      "    for (let i = 2, s = Math.sqrt(num); i <= s; i++)",
+      "        if (num % i === 0) return false;"
+    ],
+    "TotalLines": 12
+  },
+  {
+    "WatchExpressionFilePath": "src/index2.ts",
+    "LineRange": {
+      "Start": 7,
+      "End": 10
+    },
+    "ReversedLineRange": {
+      "Start": 2,
+      "End": 5
+    },
+    "Lines": [
+      "function isPrime(num: number): boolean {",
+      "    for (let i = 2, s = Math.sqrt(num); i <= s; i++)",
+      "        if (num % i === 0) return false;",
+      "    return num !== 1;"
+    ],
+    "TotalLines": 12
+  }
+]

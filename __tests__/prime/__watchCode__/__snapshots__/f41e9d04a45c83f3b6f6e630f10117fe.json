@@ -20,15 +20,15 @@
   {
     "WatchExpressionFilePath": "src/index.ts",
     "LineRange": {
-      "Start": 6,
-      "End": 6
+      "Start": 1,
+      "End": 1
     },
     "ReversedLineRange": {
-      "Start": 6,
-      "End": 6
+      "Start": 11,
+      "End": 11
     },
     "Lines": [
-      "//from https://stackoverflow.com/questions/40200089/is-a-number-prime"
+      "/**"
     ],
     "TotalLines": 12
   },
