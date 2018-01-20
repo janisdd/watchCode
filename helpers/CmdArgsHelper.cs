@@ -20,6 +20,9 @@ namespace watchCode.helpers
         private static bool insideHashAlgorithmToUse = false;
         private static bool insideConfigFileName = false;
         private static bool insideAlsoUseReverseLines = false;
+        private static bool insideFilesToIgnore = false;
+        private static bool insideDirsToIgnore = false;
+        private static bool insideNotUseInMemoryStringBuilderFileForUpdateingDocs = false;
 
         public static (CmdArgs, Config) ParseArgs(string[] args)
         {
@@ -110,6 +113,28 @@ namespace watchCode.helpers
                         continue;
                         break;
                         
+                    case ParameterStart + "ignoreFile":
+                    case ParameterStart + "ignoreFiles":
+                        ResetInsideArgs();
+                        insideFilesToIgnore = true;
+                        continue;
+                        break;
+                        
+                    case ParameterStart + "ignoreDir":
+                    case ParameterStart + "ignoreDirs":
+                        ResetInsideArgs();
+                        insideDirsToIgnore = true;
+                        continue;
+                        break;
+                    
+                    case ParameterStart + "tempFile":
+                    case ParameterStart + "tempFiles":
+                        ResetInsideArgs();
+                        insideNotUseInMemoryStringBuilderFileForUpdateingDocs = true;
+                        continue;
+                        break;
+                        
+                        
                     case ParameterStart + "config":
                         ResetInsideArgs();
                         insideConfigFileName = true;
@@ -133,6 +158,10 @@ namespace watchCode.helpers
                 if (insideNoCompressLines) config.CompressLines = false;
                 if (insideHashAlgorithmToUse) config.HashAlgorithmToUse = arg;
                 if (insideAlsoUseReverseLines) config.AlsoUseReverseLines = true;
+                if (insideFilesToIgnore) config.FilesToIgnore.Add(arg);
+                if (insideDirsToIgnore) config.DirsToIgnore.Add(arg);
+                if (insideNotUseInMemoryStringBuilderFileForUpdateingDocs)
+                    config.UseInMemoryStringBuilderFileForUpdateingDocs = false;
                 
                 if (insideConfigFileName) cmdArgs.ConfigFileNameWithExtension = arg;
             }
@@ -157,6 +186,9 @@ namespace watchCode.helpers
             insideHashAlgorithmToUse = false;
             insideConfigFileName = false;
             insideAlsoUseReverseLines = false;
+            insideFilesToIgnore = false;
+            insideDirsToIgnore = false;
+            insideNotUseInMemoryStringBuilderFileForUpdateingDocs = false;
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using watchCode.helpers;
@@ -17,6 +18,9 @@ namespace watchCode.model
         public List<string> Dirs { get; set; }
 
         public List<string> Files { get; set; }
+
+        public List<string> DirsToIgnore { get; set; }
+        public List<string> FilesToIgnore { get; set; }
 
         /// <summary>
         /// true: check <see cref="Dirs"/> recursively
@@ -72,23 +76,34 @@ namespace watchCode.model
         /// </summary>
         public string DumpWatchExpressionsFileName { get; set; }
 
-        
+
         public bool AlsoUseReverseLines { get; set; }
 
-        //--- not accessible via command line
         
         /// <summary>
-        /// the keywords to initiate a watch expression
+        /// use string builder instead of temp creating a file
+        /// 
+        /// also when using a temp file the original doc file will be deleted and the temp file will
+        /// be moved to the doc file location (so this removes all file attributes...) TODO maybe
         /// </summary>
-        public List<string> InitWatchExpressionKeywords;
+        public bool UseInMemoryStringBuilderFileForUpdateingDocs { get; set; }
+
+        //--- not accessible via command line
+
+        /// <summary>
+        /// the keywords to initiate a watch expression
+        /// 
+        /// THIS is only for serialization use for real usage <see cref="DynamicConfig.InitWatchExpressionKeywords"/>
+        /// </summary>
+        public List<string> InitWatchExpressionKeywords { get; set; }
 
         /// <summary>
         /// a dictionary with extensions and comments syntax to know which documention files we need to consider
+        /// 
+        /// HIS is only for serialization use for real usage <see cref="DynamicConfig.KnownFileExtensionsWithoutExtension"/>
         /// </summary>
-        public Dictionary<string, List<(string start, string end)>> KnownFileExtensionsWithoutExtension;
+        public Dictionary<string, List<(string start, string end)>> KnownFileExtensionsWithoutExtension { get; set; }
 
-        
-        
 
         /// <summary>
         /// checks if every prop has a != null value
@@ -111,8 +126,38 @@ namespace watchCode.model
                     return false;
                 }
             }
+
+            foreach (var filePath in config.Files)
+            {
+                var absolutePath = DynamicConfig.GetAbsoluteFilePath(filePath);
+                if (!File.Exists(absolutePath))
+                    Logger.Warn($"ignoring file to check: {absolutePath} because it does not exist");
+            }
+            
+            foreach (var filePath in config.FilesToIgnore)
+            {
+                var absolutePath = DynamicConfig.GetAbsoluteFilePath(filePath);
+                if (!File.Exists(absolutePath))
+                    Logger.Warn($"ignoring file on ignore list: {absolutePath} because it does not exist");
+            }
+            
+            foreach (var filePath in config.Dirs)
+            {
+                var absolutePath = DynamicConfig.GetAbsoluteFilePath(filePath);
+                if (!Directory.Exists(absolutePath))
+                    Logger.Warn($"ignoring directory to check: {absolutePath} because it does not exist");
+            }
+            
+            foreach (var filePath in config.DirsToIgnore)
+            {
+                var absolutePath = DynamicConfig.GetAbsoluteFilePath(filePath);
+                if (!File.Exists(absolutePath))
+                    Logger.Warn($"ignoring directory on ignore list: {absolutePath} because it does not exist");
+            }
+
             return true;
         }
+
 
         public static Config DefaultConfig = new Config()
         {
@@ -121,6 +166,8 @@ namespace watchCode.model
                 "." //current dir
             },
             Files = new List<string>(),
+            DirsToIgnore = new List<string>(),
+            FilesToIgnore = new List<string>(),
 
             WatchCodeDirName = "__watchCode__",
             SnapshotDirName = "__snapshots__",
@@ -131,12 +178,11 @@ namespace watchCode.model
             CombineSnapshotFiles = true,
             CompressLines = true,
             RootDir = "",
+            UseInMemoryStringBuilderFileForUpdateingDocs = true,
             HashAlgorithmToUse = HashHelper.DefaultHashAlgorithmName,
             AlsoUseReverseLines = false,
-
-            //null beacuse we want to know if the user put an empty array in config
-            InitWatchExpressionKeywords = null,
-            KnownFileExtensionsWithoutExtension = null,
+            InitWatchExpressionKeywords = new List<string>(),
+            KnownFileExtensionsWithoutExtension = new Dictionary<string, List<(string start, string end)>>(),
         };
     }
 }

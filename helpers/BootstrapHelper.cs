@@ -49,7 +49,7 @@ namespace watchCode.helpers
                     Logger.Info($"using config at: {configFileInfo.FullName}");
 
                     if (readConfig.InitWatchExpressionKeywords != null)
-                        DynamicConfig.initWatchExpressionKeywords = readConfig.InitWatchExpressionKeywords;
+                        DynamicConfig.InitWatchExpressionKeywords = readConfig.InitWatchExpressionKeywords;
 
                     if (readConfig.KnownFileExtensionsWithoutExtension != null)
                         DynamicConfig.KnownFileExtensionsWithoutExtension =

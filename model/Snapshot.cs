@@ -8,26 +8,11 @@ namespace watchCode.model
         public string WatchExpressionFilePath { get; set; }
         public LineRange? LineRange { get; set; }
 
+        /// <summary>
+        /// use  <see cref="SetReverseLineRange"/> to set this,
+        /// we need to allow this for json deserializing
+        /// </summary>
         public LineRange? ReversedLineRange { get; set; }
-
-
-        /// <summary>
-        /// the indices for the start and end of the specified lines (char position in stream)
-        /// </summary>
-        public IndexRange? LineRangeIndices { get; set; }
-
-        /// <summary>
-        /// the reverse line range from the bottom of the file up
-        /// 
-        /// LineRange does not change if lines unter the LineRange are added
-        /// 
-        /// ReverseLineRange does not change if lines above ReverseLineRange are added
-        /// 
-        /// in the original file LineRange and ReverseLineRange point to the same lines
-        /// 
-        /// if this is null this has no effect (take only LineRange then)
-        /// </summary>
-        public IndexRange? ReverseLineIndices { get; set; }
 
         /// <summary>
         /// the lines or just 1 line (a hash) if compressed
@@ -37,23 +22,32 @@ namespace watchCode.model
         public List<string> Lines { get; set; }
 
         /// <summary>
-        /// true: used <see cref="ReverseLineIndices"/> to get the lines
+        /// true: used <see cref="ReversedLineRange"/> to get the lines
+        /// only needed when re writing docs and for this we need to compare first which gives us this
         /// </summary>
         [JsonIgnore]
         public bool UsedBottomOffset { get; set; }
 
-        public Snapshot(string watchExpressionFilePath, LineRange? lineRange, LineRange? reversedLineRange,  IndexRange? lineRangeIndices,
-            IndexRange? reverseLineIndices,
+        /// <summary>
+        /// use  <see cref="SetReverseLineRange"/> to set this,
+        /// we need to allow this for json deserializing
+        /// </summary>
+        public int TotalLines { get; set; }
+
+        public Snapshot(string watchExpressionFilePath, LineRange? lineRange,
             List<string> lines)
         {
             WatchExpressionFilePath = watchExpressionFilePath;
             LineRange = lineRange;
-            ReversedLineRange = reversedLineRange;
-            LineRangeIndices = lineRangeIndices;
             Lines = lines;
-            ReverseLineIndices = reverseLineIndices;
+            TotalLines = -1;
         }
 
+        public void SetReverseLineRange(LineRange reversedLineRange, int totalLines)
+        {
+            ReversedLineRange = reversedLineRange;
+            TotalLines = totalLines;
+        }
 
         public string GetSnapshotFileNameWithoutExtension(bool combinedSnapshotFiles)
         {

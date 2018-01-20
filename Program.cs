@@ -14,7 +14,8 @@ namespace watchCode
     {
         public const int OkReturnCode = 0;
         public const int NotEqualCompareReturnCode = 1;
-        public const int ErrorReturnCode = 2;
+        public const int NeedToUpdateDocRanges = 2;
+        public const int ErrorReturnCode = 100;
 
         static int Main(string[] args)
         {
@@ -28,6 +29,7 @@ namespace watchCode
 
         public static int Run(CmdArgs cmdArgs, Config config)
         {
+            int returnCode = OkReturnCode;
             //TODO
             //reduce and alsoUseReverseLines don't work togethere
             //because reducing will take one compare for the whole file and copy results
@@ -37,14 +39,24 @@ namespace watchCode
             BootstrapHelper.Bootstrap(cmdArgs, config);
 
             //cmdArgs.Init = true;
-//            cmdArgs.Update = true;
+            //cmdArgs.Update = true;
+
             cmdArgs.Compare = true;
 
-            config.AlsoUseReverseLines = false;
+            //after updating docs all bottom to top snapshots are invalid (ranges)
+            //after the docs update we don't know which snapshot belongs to which doc watch expression...
+
+            //TODO maybe update the snapshots with the docs because the content of the snapshot won't change
+            //only the line numbers...
+
+            cmdArgs.CompareAndUpdateDocs = true;
+
+            config.AlsoUseReverseLines = true;
 
             config.CompressLines = false;
 
-
+            config.DirsToIgnore.Add(DynamicConfig.GetAbsoluteWatchCodeDirPath(config.WatchCodeDirName));
+            
             if (Config.Validate(config, cmdArgs) == false)
             {
                 Logger.Error("config was invalid, exitting");
@@ -52,11 +64,13 @@ namespace watchCode
                 return ErrorReturnCode;
             }
 
+            
 
             #region --- get all doc files that could contain watch expressions 
 
             var allDocFileInfos = FileIteratorHelper.GetAllFiles(config.Files, config.Dirs,
-                DynamicConfig.KnownFileExtensionsWithoutExtension.Keys.ToList(), true);
+                DynamicConfig.KnownFileExtensionsWithoutExtension.Keys.ToList(), true, config.FilesToIgnore,
+                config.DirsToIgnore);
 
             #endregion
 
@@ -69,7 +83,7 @@ namespace watchCode
             {
                 var watchExpressions = WatchExpressionParseHelper.GetAllWatchExpressions(docFileInfo,
                     DynamicConfig.KnownFileExtensionsWithoutExtension,
-                    DynamicConfig.initWatchExpressionKeywords);
+                    DynamicConfig.InitWatchExpressionKeywords);
 
                 allWatchExpressions.AddRange(watchExpressions);
             }
@@ -98,31 +112,53 @@ namespace watchCode
             //--- main part
 
 
-            Dictionary<WatchExpression, (bool wasEqual, bool useBottomToTop, LineRange? reverseLineRange)> equalMap;
+            Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap;
 
-            if (config.ReduceWatchExpressions.Value)
-            {
-                ReducedWatchExpressionsRun(allWatchExpressions, cmdArgs, config, out equalMap);
-            }
-            else
-            {
-                NoReduceWatchExpressionsRun(allWatchExpressions, cmdArgs, config, out equalMap);
-            }
 
+            NoReduceWatchExpressionsRun(allWatchExpressions, cmdArgs, config, out equalMap);
 
             if (cmdArgs.Compare)
             {
-                OutputEqualsResults(equalMap, out var someSnapshotChanged);
+                OutputEqualsResults(equalMap, out var someSnapshotChanged, out var someSnapshotUsedBottomToTopLines);
 
-                if (someSnapshotChanged) return NotEqualCompareReturnCode;
+                if (someSnapshotUsedBottomToTopLines)
+                {
+                    Console.WriteLine("seems that you need to update the line range because" +
+                                      "some lines in some files were inserted...");
+                    Console.WriteLine("you can run the command compare and update docs to automatically update" +
+                                      "the line ranges...");
+
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("...this will rewrite the watch expression comments and delete every text " +
+                                      "before and after the watch expression inside the corresponding comment");
+                    Console.ResetColor();
+
+                    returnCode = NeedToUpdateDocRanges;
+                }
+                else if (someSnapshotChanged)
+                {
+                    returnCode = NotEqualCompareReturnCode;
+                }
+
+                if (cmdArgs.CompareAndUpdateDocs)
+                {
+                    UpdateDocCommentWatchExpressions(equalMap, config);
+                }
             }
 
-            return OkReturnCode;
+            return returnCode;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="allWatchExpressions"></param>
+        /// <param name="cmdArgs"></param>
+        /// <param name="config"></param>
+        /// <param name="equalMap">one entry for every item in allWatchExpressions</param>
         private static void NoReduceWatchExpressionsRun(List<WatchExpression> allWatchExpressions, CmdArgs cmdArgs,
             Config config,
-            out Dictionary<WatchExpression, (bool wasEqual, bool useBottomToTop, LineRange? reverseLineRange)> equalMap)
+            out Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap)
         {
             var snapshotsDictionary =
                 new Dictionary<string, List<(Snapshot snapshot, WatchExpression watchExpression)>>();
@@ -131,7 +167,7 @@ namespace watchCode
 
             //stores the equal result for every watch expression
             equalMap =
-                new Dictionary<WatchExpression, (bool wasEqual, bool useBottomToTop, LineRange? reverseLineRange)>();
+                new Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)>();
 
             foreach (var watchExpression in allWatchExpressions)
             {
@@ -178,145 +214,11 @@ namespace watchCode
         }
 
 
-        private static void ReducedWatchExpressionsRun(List<WatchExpression> allWatchExpressions, CmdArgs cmdArgs,
-            Config config,
-            out Dictionary<WatchExpression, (bool wasEqual, bool useBottomToTop, LineRange? reverseLineRange)> equalMap)
-        {
-            var snapshotsDictionary =
-                new Dictionary<string, List<(Snapshot snapshot, WatchExpression watchExpression)>>();
-
-            var alreadyReadSnapshots = new Dictionary<string, List<Snapshot>>();
-
-            //stores the equal result for every watch expression
-            equalMap =
-                new Dictionary<WatchExpression, (bool wasEqual, bool useBottomToTop, LineRange? reverseLineRange)>();
-
-
-            #region grouping, so that we eventually don't need to evaluate all watch expression
-
-            //group by file name --> because we will store all watch expression for one file in one file
-            // ReSharper disable once PossibleInvalidOperationException
-            var groupedWatchExpressionsByFileName = allWatchExpressions
-                .GroupBy(p => p.GetSnapshotFileNameWithoutExtension(config.CombineSnapshotFiles.Value))
-                .ToList();
-
-            /*
-             * nevertheless we can reduce the amount of watch expression more...
-             *
-             * given group X of watch expressions
-             *     if a line range is included in another watch expressions line range
-             *     we only need to evaluate the larger range
-             * 
-             *     BUT we still need the groups because the user wants to know where
-             *     he need to update the documentation
-             *
-             *     so just iterate through the group and give the result of the largest
-             *     expressions for every member of the group
-             *
-             */
-
-            foreach (var group in groupedWatchExpressionsByFileName)
-            {
-                var sameFileNameWatchExpressions = group.ToList();
-                if (sameFileNameWatchExpressions.Count == 0)
-                {
-                    Logger.Log("found empty group of watch expressions ... should not happen, skipping");
-                }
-
-                //TODO maybe reduce intersecting watch expressions...
-                //not 100% sure this is correct...
-
-                //we can have multiple nested regions...
-                //store for every region the largest and the containg expressions
-                var ranks = new List<(WatchExpression largest, List<WatchExpression> containedExpressions)>();
-
-                //e.g. watch same file lines 6, 7-10, full file 1-11
-                //then we would get two buckets but both has same full file as largest
-
-                //so better sort them first by range
-                //if an expression y would go into bucket x then we know x.start <= y.start
-
-                var orderedSameFileNameWatchExpressions = sameFileNameWatchExpressions
-                        .OrderBy(p => p.LineRange?.Start ?? Int32.MinValue)
-                        .ToList()
-                    ;
-
-                for (int i = 0; i < orderedSameFileNameWatchExpressions.Count; i++) //already checked i=0
-                {
-                    var watchExpression = orderedSameFileNameWatchExpressions[i];
-
-                    //first needs to be added manually
-                    if (ranks.Count == 0)
-                    {
-                        ranks.Add((watchExpression, new List<WatchExpression>()));
-                        continue;
-                    }
-
-                    //check if the watch expression is already included in another
-                    for (int j = 0; j < ranks.Count; j++)
-                    {
-                        var tuple = ranks[j];
-
-                        if (tuple.largest.IncludesOther(watchExpression))
-                        {
-                            tuple.containedExpressions.Add(watchExpression);
-                        }
-                        else if (watchExpression.IncludesOther(tuple.largest))
-                        {
-                            //found new largest
-                            tuple.containedExpressions.Add(tuple.largest);
-                            tuple.largest = watchExpression;
-                        }
-                        else
-                        {
-                            //create new group becasue distinct or intersect with other groups...
-                            ranks.Add((watchExpression, new List<WatchExpression>()));
-                            break;
-                        }
-                    }
-                }
-
-                //we found the largest watch expression..
-
-                //now evaulate all necessary
-
-                foreach (var tuple in ranks)
-                {
-                    EvaulateSingleWatchExpression(tuple.largest, cmdArgs, config,
-                        snapshotsDictionary, alreadyReadSnapshots, equalMap);
-
-
-                    if (cmdArgs.Init || cmdArgs.Update)
-                    {
-                        // ReSharper disable once PossibleInvalidOperationException
-                        if (config.CombineSnapshotFiles.Value)
-                        {
-                            //we haven't written any snapshots yet...
-                            BulkWriteCapturedSnapshots(config, snapshotsDictionary);
-                        }
-                        //else already created in EvaulateSingleWatchExpression
-                    }
-
-                    if (cmdArgs.Compare)
-                    {
-                        var snapshotsWereEqual = equalMap[tuple.largest];
-
-                        //copy result to sub line ranges
-                        foreach (var watchExpression in tuple.containedExpressions)
-                            equalMap.Add(watchExpression, snapshotsWereEqual);
-                    }
-                }
-            }
-
-            #endregion
-        }
-
-
         private static void EvaulateSingleWatchExpression(WatchExpression watchExpression, CmdArgs cmdArgs,
             Config config,
             Dictionary<string, List<(Snapshot snapshot, WatchExpression watchExpression)>> snapshotsDictionary,
             Dictionary<string, List<Snapshot>> alreadyReadSnapshots,
-            Dictionary<WatchExpression, (bool wasEqual, bool useBottomToTop, LineRange? reverseLineRange)> equalMap
+            Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap
         )
         {
             if (cmdArgs.Init)
@@ -501,7 +403,10 @@ namespace watchCode
                         alreadyReadSnapshots.Add(watchExpression.WatchExpressionFilePath, oldSnapshots);
 
 
-                        oldSnapshot = oldSnapshots?.FirstOrDefault(p => p.LineRange == watchExpression.LineRange);
+                        oldSnapshot = oldSnapshots?.FirstOrDefault(p =>
+                            p.LineRange == watchExpression.LineRange || (
+                                p.ReversedLineRange != null && DocsHelper.GetNewLineRange(watchExpression, p) ==
+                                watchExpression.LineRange));
                     }
                 }
                 else
@@ -510,11 +415,25 @@ namespace watchCode
                 }
 
 
+                bool areEqual;
+
                 Snapshot newSnapshot = null;
 
-                if (oldSnapshot == null || oldSnapshot.LineRange == null || oldSnapshot.LineRangeIndices == null ||
-                    oldSnapshot.ReverseLineIndices == null)
+
+                if (oldSnapshot == null)
                 {
+                    //normally this can't happen ... because we created the snapshot...
+                    //but on error or if someone deleted the snapshot in the snapshot dir...
+                    areEqual = false;
+                    equalMap.Add(watchExpression, (areEqual, oldSnapshot, newSnapshot));
+
+                    return;
+                }
+                else if (oldSnapshot.LineRange == null || oldSnapshot.ReversedLineRange == null)
+                {
+                    //old snapshot was for the whote file or we don't
+                    //know reversed lines ... so take normal snapshot
+
                     // ReSharper disable once PossibleInvalidOperationException
                     newSnapshot =
                         SnapshotWrapperHelper.CreateSnapshot(watchExpression, config.CompressLines.Value,
@@ -524,7 +443,6 @@ namespace watchCode
                 {
                     //the old snapshot exists & has the same line ranges...
 
-
                     // ReSharper disable once PossibleInvalidOperationException
                     newSnapshot =
                         SnapshotWrapperHelper.CreateSnapshotBasedOnOldSnapshot(watchExpression,
@@ -532,9 +450,17 @@ namespace watchCode
                 }
 
 
-                bool areEqual = SnapshotWrapperHelper.AreSnapshotsEqual(oldSnapshot, newSnapshot);
-
-                equalMap.Add(watchExpression, (areEqual, newSnapshot.UsedBottomOffset, newSnapshot.ReversedLineRange));
+                if (newSnapshot == null)
+                {
+                    areEqual = false;
+                    equalMap.Add(watchExpression, (areEqual, oldSnapshot, null));
+                }
+                else
+                {
+                    areEqual = SnapshotWrapperHelper.AreSnapshotsEqual(oldSnapshot, newSnapshot);
+                    equalMap.Add(watchExpression,
+                        (areEqual, oldSnapshot, newSnapshot));
+                }
 
                 #endregion
             }
@@ -542,17 +468,17 @@ namespace watchCode
 
 
         private static void OutputEqualsResults(
-            Dictionary<WatchExpression, (bool wasEqual, bool useBottomToTop, LineRange? reverseLineRange)> equalMap,
-            out bool someSnapshotChanged)
+            Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap,
+            out bool someSnapshotChanged, out bool someSnapshotUsedBottomToTopLines)
         {
-            (bool wasEqual, bool useBottomToTop, LineRange? reverseLineRange) tuple;
             WatchExpression watchExpression;
 
             someSnapshotChanged = false;
+            someSnapshotUsedBottomToTopLines = false;
 
             foreach (var pair in equalMap)
             {
-                tuple = pair.Value;
+                var tuple = pair.Value;
                 watchExpression = pair.Key;
 
                 string range = watchExpression.LineRange == null
@@ -561,10 +487,21 @@ namespace watchCode
 
                 if (tuple.wasEqual)
                 {
-                    if (tuple.useBottomToTop)
+                    if (tuple.newSnapshot.UsedBottomOffset)
                     {
+                        someSnapshotUsedBottomToTopLines = true;
+
                         Logger.Info(
-                            $"snapshots are equal! file name: {watchExpression.WatchExpressionFilePath}, range from bottom: {tuple.reverseLineRange}");
+                            $"snapshots are equal! file name: {watchExpression.WatchExpressionFilePath}, range from bottom: {tuple.newSnapshot.ReversedLineRange}");
+
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.Write(watchExpression.WatchExpressionFilePath);
+                        Console.ResetColor();
+                        Console.Write(" lines inserted before, update line range --> ");
+                        Console.ForegroundColor = ConsoleColor.DarkGreen;
+                        Console.Write(watchExpression.GetDocumentationLocation());
+                        Console.WriteLine();
+                        Console.ResetColor();
                     }
                     else
                     {
@@ -591,11 +528,34 @@ namespace watchCode
                 }
             }
 
-            if (someSnapshotChanged == false)
+
+            if (someSnapshotChanged == false && someSnapshotUsedBottomToTopLines == false)
             {
                 Console.ForegroundColor = ConsoleColor.DarkGreen;
                 Console.WriteLine("docs are ok");
                 Console.ResetColor();
+            }
+        }
+
+
+        private static void UpdateDocCommentWatchExpressions(
+            Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap,
+            Config config)
+        {
+            var groupedWatchExpressions = equalMap
+                    .Where(p => p.Value.wasEqual) //if not equal we cannot recover via searching from bottom
+                    .GroupBy(p => p.Key.GetDocumentationLocation())
+                    .ToList()
+                ;
+
+            foreach (var group in groupedWatchExpressions)
+            {
+                var tuple = group.ToList();
+                var expressionAndSnapshotTuples = tuple.Select(p => (p.Key, p.Value.newSnapshot)).ToList();
+
+                var updated = DocsHelper.UpdateWatchExpressionInDocFile(expressionAndSnapshotTuples,
+                    DynamicConfig.KnownFileExtensionsWithoutExtension, DynamicConfig.InitWatchExpressionKeywords,
+                    config);
             }
         }
 

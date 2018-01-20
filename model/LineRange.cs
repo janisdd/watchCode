@@ -36,5 +36,16 @@
         {
             return Start + "-" + End;
         }
+        
+        /// <summary>
+        /// tries to return a short representation of the rang
+        /// </summary>
+        /// <returns></returns>
+        public string ToShortString()
+        {
+            if (Start == End) return Start.ToString();
+            
+            return Start + "-" + End;
+        }
     }
 }

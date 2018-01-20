@@ -9,20 +9,13 @@
       "Start": 2,
       "End": 5
     },
-    "LineRangeIndices": {
-      "Start": 108,
-      "End": 265
-    },
-    "ReverseLineIndices": {
-      "Start": 2,
-      "End": 159
-    },
     "Lines": [
       "function isPrime(num: number): boolean {",
       "    for (let i = 2, s = Math.sqrt(num); i <= s; i++)",
       "        if (num % i === 0) return false;",
       "    return num !== 1;"
-    ]
+    ],
+    "TotalLines": 12
   },
   {
     "WatchExpressionFilePath": "src/index.ts",
@@ -34,24 +27,15 @@
       "Start": 6,
       "End": 6
     },
-    "LineRangeIndices": {
-      "Start": 38,
-      "End": 108
-    },
-    "ReverseLineIndices": {
-      "Start": 159,
-      "End": 229
-    },
     "Lines": [
       "//from https://stackoverflow.com/questions/40200089/is-a-number-prime"
-    ]
+    ],
+    "TotalLines": 12
   },
   {
     "WatchExpressionFilePath": "src/index.ts",
     "LineRange": null,
     "ReversedLineRange": null,
-    "LineRangeIndices": null,
-    "ReverseLineIndices": null,
     "Lines": [
       "/**",
       " * Created by janis dähne.",
@@ -64,6 +48,7 @@
       "        if (num % i === 0) return false;",
       "    return num !== 1;",
       "}"
-    ]
+    ],
+    "TotalLines": -1
   }
 ]

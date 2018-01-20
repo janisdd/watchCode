@@ -12,6 +12,8 @@
 
 - reduce expressions if y includes x and x changed --> y changed! but if x does not change we don't know for y
 
+- what if range out of file lines?
+
 
 ### if you are creazy
 

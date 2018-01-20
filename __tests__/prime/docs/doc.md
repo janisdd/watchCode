@@ -1,12 +1,12 @@
 # docs
 
-<!-- 
-@watch src/index.ts 7-10
--->
+<!-- @watch src/index.ts 9-12 -->
+
+
 checks whether the given number is a prime (true) or not (false)
 
 
-<!-- @watch src/index.ts 6 -->
+<!-- @watch src/index.ts 8 -->
 the code was taken from `https://stackoverflow.com/questions/40200089/is-a-number-prime`
 
 

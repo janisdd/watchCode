@@ -11,7 +11,7 @@ namespace watchCode.helpers
             bool alsoUseReverseLines)
         {
             //create snapshot
-            string path = DynamicConfig.GetAbsoluteFileToWatchPath(watchExpression.WatchExpressionFilePath);
+            string path = DynamicConfig.GetAbsoluteFilePath(watchExpression.WatchExpressionFilePath);
             var snapshot =
                 SnapshotHelper.CreateSnapshot(path, watchExpression, compressLines, alsoUseReverseLines);
 
@@ -19,32 +19,12 @@ namespace watchCode.helpers
         }
 
 
-        public static Snapshot CreateSnapshotBasedOnOldSnapshotWithIndices(WatchExpression watchExpression,
-            bool compressLines,
-            Snapshot oldSnapshot, bool alsoUseReverseLines)
-        {
-            //create snapshot
-            string path = DynamicConfig.GetAbsoluteFileToWatchPath(watchExpression.WatchExpressionFilePath);
-
-            if (watchExpression.LineRange == null)
-            {
-                //we need to read the whole file so no difference using stream indices...
-                return SnapshotHelper.CreateSnapshot(path, watchExpression, compressLines, alsoUseReverseLines);
-            }
-
-            var snapshot =
-                SnapshotHelper.CreateSnapshotBasedOnOldSnapshotWithIndices(path, watchExpression, compressLines,
-                    oldSnapshot);
-
-            return snapshot;
-        }
-
 
         public static Snapshot CreateSnapshotBasedOnOldSnapshot(WatchExpression watchExpression, bool compressLines,
             Snapshot oldSnapshot, bool alsoUseReverseLines)
         {
             //create snapshot
-            string path = DynamicConfig.GetAbsoluteFileToWatchPath(watchExpression.WatchExpressionFilePath);
+            string path = DynamicConfig.GetAbsoluteFilePath(watchExpression.WatchExpressionFilePath);
 
             if (watchExpression.LineRange == null || alsoUseReverseLines == false)
             {
@@ -61,7 +41,7 @@ namespace watchCode.helpers
         }
 
 
-        public static bool AreSnapshotsEqual(Snapshot oldSnapshot, Snapshot newSnapshot, bool compareMetaData = true)
+        public static bool AreSnapshotsEqual(Snapshot oldSnapshot, Snapshot newSnapshot, bool compareMetaData = false)
         {
             if (oldSnapshot == null || newSnapshot == null) return false;
 

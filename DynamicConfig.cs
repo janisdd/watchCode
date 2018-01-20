@@ -10,7 +10,7 @@ namespace watchCode
 
         public static Dictionary<string, List<(string start, string end)>> KnownFileExtensionsWithoutExtension;
 
-        public static List<string> initWatchExpressionKeywords;
+        public static List<string> InitWatchExpressionKeywords;
 
         static DynamicConfig()
         {
@@ -21,7 +21,7 @@ namespace watchCode
                 ("<!--", "-->")
             });
 
-            initWatchExpressionKeywords = new List<string>()
+            InitWatchExpressionKeywords = new List<string>()
             {
                 "@watch"
             };
@@ -37,7 +37,7 @@ namespace watchCode
             return Path.Combine(GetAbsoluteWatchCodeDirPath(watchCodeDirName), snapshotDirName);
         }
 
-        public static string GetAbsoluteFileToWatchPath(string watchExpressionFilePath)
+        public static string GetAbsoluteFilePath(string watchExpressionFilePath)
         {
             return Path.Combine(AbsoluteRootDirPath, watchExpressionFilePath);
         }

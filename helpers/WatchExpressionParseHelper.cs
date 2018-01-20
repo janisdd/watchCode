@@ -79,7 +79,7 @@ namespace watchCode.helpers
             for (int i = 0; i < startIndex + length; i++)
             {
                 if (i == startIndex) startLine = line;
-                if (text[i] == '\n') line++;
+                if (text[i] == '\n') line++; //TODO \r\n for windows
             }
             //the last one is text[startIndex + length - 1] that is exactly the last char of the match...
             endLine = line;
@@ -124,14 +124,17 @@ namespace watchCode.helpers
                 watchExpressionString.Split(new char[] {','}, StringSplitOptions.RemoveEmptyEntries);
 
 
+            WatchExpression? previousWatchExpression = null;
             foreach (var expressionString in possibleWatchExpressionStrings)
             {
                 var watchExpresion =
-                    ParseSingleWatchExpression(expressionString, fileInfo, watchExpressionFoundLineRange);
+                    ParseSingleWatchExpression(expressionString, fileInfo, watchExpressionFoundLineRange,
+                        previousWatchExpression);
 
                 if (watchExpresion == null) continue;
 
                 watchExpressions.Add(watchExpresion.Value);
+                previousWatchExpression = watchExpresion;
             }
 
 
@@ -140,7 +143,7 @@ namespace watchCode.helpers
 
 
         private static WatchExpression? ParseSingleWatchExpression(string possibleWatchExpression, FileInfo fileInfo,
-            LineRange watchExpressionFoundLineRange)
+            LineRange watchExpressionFoundLineRange, WatchExpression? previousWatchExpression)
         {
             possibleWatchExpression = possibleWatchExpression.Trim();
 
@@ -188,6 +191,7 @@ namespace watchCode.helpers
             }
 
 
+            LineRange? lineRang = null;
             var filePath = builder.ToString();
 
             if (filePath.Length == 0)
@@ -197,7 +201,25 @@ namespace watchCode.helpers
                 return null;
             }
 
-            LineRange? lineRang = null;
+            lineRang = ParseLineRange(filePath, fileInfo, true);
+
+            if (lineRang != null)
+            {
+                //the path is a line range so take the file path of the previous watch expression 
+                if (previousWatchExpression == null)
+                {
+                    Logger.Warn(
+                        $"found invalid watch expression (only line range): {possibleWatchExpression} in file: {fileInfo.FullName}, skipping");
+                    return null;
+                }
+
+                filePath = previousWatchExpression.Value.WatchExpressionFilePath;
+
+                //make sure the doc file position is the same
+                return new WatchExpression(filePath, lineRang, documentationFileRelativePath,
+                    new LineRange(previousWatchExpression.Value.DocumentationLineRange.Start,
+                        previousWatchExpression.Value.DocumentationLineRange.End));
+            }
 
             var lineRangString = possibleWatchExpression.Substring(builder.Length);
 
@@ -205,7 +227,7 @@ namespace watchCode.helpers
 
             if (string.IsNullOrWhiteSpace(lineRangString) == false) //we have specific line(s) to watch
             {
-                lineRang = ParseLineRange(lineRangString, fileInfo);
+                lineRang = ParseLineRange(lineRangString, fileInfo, false);
 
                 if (lineRang == null) return null;
             }
@@ -214,7 +236,7 @@ namespace watchCode.helpers
                 watchExpressionFoundLineRange);
         }
 
-        private static LineRange? ParseLineRange(string possibleLineRang, FileInfo fileInfo)
+        private static LineRange? ParseLineRange(string possibleLineRang, FileInfo fileInfo, bool supressWarnings)
         {
             possibleLineRang = possibleLineRang.Trim();
 
@@ -229,29 +251,37 @@ namespace watchCode.helpers
 
                 if (int.TryParse(rangeStrings[0], out start) == false)
                 {
-                    Logger.Warn(
-                        $"found invalid line range expression (start value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
+                    if (supressWarnings == false)
+                        Logger.Warn(
+                            $"found invalid line range expression (start value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
+
                     return null;
                 }
 
                 if (start < 0)
                 {
-                    Logger.Warn(
-                        $"found invalid (negative) line range expression (start value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
+                    if (supressWarnings == false)
+                        Logger.Warn(
+                            $"found invalid (negative) line range expression (start value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
+
                     return null;
                 }
 
                 if (int.TryParse(rangeStrings[1], out end) == false)
                 {
-                    Logger.Warn(
-                        $"found invalid line range expression (end value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
+                    if (supressWarnings == false)
+                        Logger.Warn(
+                            $"found invalid line range expression (end value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
+
                     return null;
                 }
 
                 if (end < 0)
                 {
-                    Logger.Warn(
-                        $"found invalid (negative) line range expression (end value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
+                    if (supressWarnings == false)
+                        Logger.Warn(
+                            $"found invalid (negative) line range expression (end value): {possibleLineRang} in file: {fileInfo.FullName}, skipping");
+
                     return null;
                 }
 
