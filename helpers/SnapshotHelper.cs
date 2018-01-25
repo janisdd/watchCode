@@ -12,29 +12,104 @@ namespace watchCode.helpers
     {
         public static string SnapshotFileExtension = "json";
 
+
+        private static Snapshot CheckAndCorrectSnapshot(WatchExpression watchExpression, Snapshot snapshot)
+        {
+            if (snapshot.LineRange != null)
+            {
+                if (snapshot.LineRange.Start > snapshot.TotalLinesInFile)
+                {
+                    Logger.Warn($"watch expression at: {watchExpression.GetDocumentationLocation()} has " +
+                                $"too large line range (start), watched file: {watchExpression.WatchExpressionFilePath} " +
+                                $"has actually only {snapshot.TotalLinesInFile} lines in total...");
+
+                    Logger.Warn($"...using total lines in file for end range value...");
+                    snapshot.LineRange.Start = snapshot.TotalLinesInFile;
+                }
+
+                if (snapshot.LineRange.End > snapshot.TotalLinesInFile)
+                {
+                    Logger.Warn($"watch expression at: {watchExpression.GetDocumentationLocation()} has " +
+                                $"too large line range (end), watched file: {watchExpression.WatchExpressionFilePath} " +
+                                $"has actually only {snapshot.TotalLinesInFile} lines in total...");
+
+                    Logger.Warn($"...using total lines in file for end range value...");
+                    snapshot.LineRange.End = snapshot.TotalLinesInFile;
+                }
+
+
+                if (snapshot.ReversedLineRange == null)
+                {
+                    Logger.Warn(
+                        $"reverse line range cannot be null if LineRange is set, " +
+                        $"doc file: {watchExpression.GetDocumentationLocation()}");
+                    return null;
+                }
+
+                if (snapshot.LineRange.Start <= 0)
+                {
+                    Logger.Warn($"watch expression start line range at: {watchExpression.GetDocumentationLocation()} " +
+                                $"has < 1 value which is invalid, must be >= 1 ... using 1 instead");
+                    snapshot.LineRange.Start = 1;
+                }
+
+                if (snapshot.LineRange.End <= 0)
+                {
+                    Logger.Warn($"watch expression end line range at: {watchExpression.GetDocumentationLocation()} " +
+                                $"has < 1 value which is invalid, must be >= 1");
+                    return null;
+                }
+
+                if (snapshot.LineRange.End < snapshot.LineRange.Start)
+                {
+                    Logger.Warn($"watch expression line range at: {watchExpression.GetDocumentationLocation()} " +
+                                $"has a larger end line number than start line number");
+                    return null;
+                }
+
+                if (snapshot.LineRange.GetLength() != snapshot.ReversedLineRange.GetLength())
+                {
+                    Logger.Warn(
+                        $"watch expression line range and reverse line range have not equal length, " +
+                        $"doc file: {watchExpression.GetDocumentationLocation()}");
+                    return null;
+                }
+
+                if (snapshot.Lines.Count != snapshot.LineRange.GetLength())
+                {
+                    Logger.Warn(
+                        $"watch expression line range and saved lines (length) are not equal, " +
+                        $"doc file: {watchExpression.GetDocumentationLocation()}");
+                    return null;
+                }
+            }
+
+
+            return snapshot;
+        }
+
         /// <summary>
         /// </summary>
         /// <param name="absoluteFilePath"></param>
         /// <param name="watchExpression"></param>
-        /// <param name="compressLines">true: compress to one line using md5 hash, false: use plaing lines</param>
-        /// <param name="alsoUseReverseLines"></param>
+        /// <param name="storePlainLines">true: store the watched plain lines in the snapshot 
+        /// (useful when we search through the file and try to find the old lines), else: not</param>
         /// <returns></returns>
-        public static Snapshot CreateSnapshot(string absoluteFilePath, WatchExpression watchExpression,
-            bool compressLines, bool alsoUseReverseLines)
+        public static Snapshot CreateSnapshot(string absoluteFilePath, WatchExpression watchExpression)
         {
             FileInfo fileInfo;
 
             #region --- some checks
 
-            if (watchExpression.LineRange.HasValue &&
-                (watchExpression.LineRange.Value.Start <= 0 || watchExpression.LineRange.Value.End <= 0 ||
-                 watchExpression.LineRange.Value.End < watchExpression.LineRange.Value.Start))
+            if (watchExpression.LineRange != null &&
+                (watchExpression.LineRange.Start <= 0 || watchExpression.LineRange.End <= 0 ||
+                 watchExpression.LineRange.End < watchExpression.LineRange.Start))
             {
                 //this can happen if the file is e.g. renamed... so jsut a warning
                 //the compare will be ok if because the new snapshot will be null
                 Logger.Warn(
                     $"could not create snapshot for file: {absoluteFilePath} because line range was " +
-                    $"invalide: start: {watchExpression.LineRange.Value.Start}, end: {watchExpression.LineRange.Value.End}, " +
+                    $"invalide: start: {watchExpression.LineRange.Start}, end: {watchExpression.LineRange.End}, " +
                     $"at doc file: {watchExpression.GetDocumentationLocation()}");
                 return null;
             }
@@ -65,101 +140,44 @@ namespace watchCode.helpers
 
             List<string> lines = new List<string>();
 
-            int count = 1;
+            int linesCount = 1;
             string line;
 
-            LineRange reversedLineRange = new LineRange();
+            LineRange reversedLineRange = null;
+            Snapshot newSnapshot;
 
             try
             {
-                if (compressLines)
+                if (watchExpression.LineRange == null)
                 {
-                    #region --- compress to one line
-
-                    if (watchExpression.LineRange == null)
-                    {
-                        lines.Add(HashHelper.GetHashForFile(fileInfo));
-                    }
-                    else
-                    {
-                        StringBuilder builder = new StringBuilder();
-
-                        using (var sr = new StreamReader(File.Open(absoluteFilePath, FileMode.Open)))
-                        {
-                            while ((line = sr.ReadLine()) != null)
-                            {
-                                if (alsoUseReverseLines)
-                                {
-                                    //iterate all lines because we need to know the total number of lines
-                                }
-                                else
-                                {
-                                    //we got all lines
-                                    break;
-                                }
-                                if (count >= watchExpression.LineRange.Value.Start &&
-                                    count <= watchExpression.LineRange.Value.End)
-                                    builder.Append(line);
-
-                                count++;
-                            }
-                        }
-
-                        string concatLines = builder.ToString();
-                        lines.Add(HashHelper.GetHash(concatLines));
-
-                        if (alsoUseReverseLines) //watchExpression.LineRange != null because of branch
-                        {
-                            reversedLineRange.Start = count - watchExpression.LineRange.Value.End;
-                            reversedLineRange.End = count - watchExpression.LineRange.Value.Start;
-                        }
-                    }
-
-                    #endregion
+                    //only watch if the file change somehow
+                    string fileHash = HashHelper.GetHashForFile(fileInfo);
+                    newSnapshot = new Snapshot(watchExpression.WatchExpressionFilePath, fileHash);
                 }
                 else
                 {
-                    //use plain lines (compressLines == false)
-
-                    #region --- plain lines
-
                     using (var sr = new StreamReader(File.Open(absoluteFilePath, FileMode.Open)))
                     {
                         while ((line = sr.ReadLine()) != null)
                         {
-                            if (watchExpression.LineRange == null)
-                            {
-                                lines.Add(line);
-                            }
-                            else
-                            {
-                                if (count > watchExpression.LineRange.Value.End)
-                                {
-                                    if (alsoUseReverseLines)
-                                    {
-                                        //iterate all lines because we need to know the total number of lines
-                                    }
-                                    else
-                                    {
-                                        //we got all lines
-                                        break;
-                                    }
-                                }
+                            if (linesCount >= watchExpression.LineRange.Start &&
+                                linesCount <= watchExpression.LineRange.End) lines.Add(line);
 
-                                if (count >= watchExpression.LineRange.Value.Start &&
-                                    count <= watchExpression.LineRange.Value.End) lines.Add(line);
-                            }
-                            count++;
+
+                            linesCount++;
                         }
                     }
 
-                    if (watchExpression.LineRange != null && alsoUseReverseLines)
-                    {
-                        reversedLineRange.Start = count - watchExpression.LineRange.Value.End;
-                        reversedLineRange.End = count - watchExpression.LineRange.Value.Start;
-                    }
+                    reversedLineRange = new LineRange(
+                        linesCount - watchExpression.LineRange.End,
+                        linesCount - watchExpression.LineRange.Start
+                    );
 
-                    #endregion
+                    newSnapshot = new Snapshot(watchExpression.WatchExpressionFilePath,
+                        watchExpression.LineRange,
+                        reversedLineRange,
+                        linesCount,
+                        lines);
                 }
             }
             catch (Exception e)
@@ -170,63 +188,20 @@ namespace watchCode.helpers
                 return null;
             }
 
-            var newSnapshot = new Snapshot(watchExpression.WatchExpressionFilePath, watchExpression.LineRange,
-                lines);
 
-
-            if (watchExpression.LineRange != null && alsoUseReverseLines)
-                newSnapshot.SetReverseLineRange(reversedLineRange, count);
-
-            if (newSnapshot.LineRange != null && newSnapshot.LineRange.Value.End > newSnapshot.TotalLines)
-            {
-                Logger.Warn($"watch expression at: {watchExpression.GetDocumentationLocation()} has " +
-                            $"too large line range, watched file: {watchExpression.WatchExpressionFilePath} " +
-                            $"has actually only {newSnapshot.TotalLines} lines in total");
-                
-                Logger.Warn($"update {watchExpression.GetDocumentationLocation()} to a valid line range: " +
-                            $"something between 1-{newSnapshot.TotalLines} and consider running init/update");
-                
-                return null;
-            }
-            
-            if (newSnapshot.LineRange != null)
-            {
-                if (newSnapshot.LineRange.Value.Start <= 0)
-                {
-                    Logger.Warn($"watch expression start line range at: {watchExpression.GetDocumentationLocation()} " +
-                                $"has < 1 value which is invalid, must be >= 1");
-                    return null;
-                }
-                
-                if (newSnapshot.LineRange.Value.End <= 0)
-                {
-                    Logger.Warn($"watch expression end line range at: {watchExpression.GetDocumentationLocation()} " +
-                                $"has < 1 value which is invalid, must be >= 1");
-                    return null;
-                }
-                
-                if (newSnapshot.LineRange.Value.End < newSnapshot.LineRange.Value.Start)
-                {
-                    Logger.Warn($"watch expression line range at: {watchExpression.GetDocumentationLocation()} " +
-                                $"has a larger end line number than start line number");
-                }
-                
-            }
-
-            return newSnapshot;
+            return CheckAndCorrectSnapshot(watchExpression, newSnapshot);
         }
 
 
         //this also checks the bottom offset lines...
         //actually
         public static Snapshot CreateSnapshotBasedOnOldSnapshot(string absoluteFilePath,
-            WatchExpression watchExpression,
-            bool compressLines, Snapshot oldSnapshot)
+            WatchExpression watchExpression, Snapshot oldSnapshot, out bool snapshotsWereEqual)
         {
             FileInfo fileInfo;
+            snapshotsWereEqual = false;
 
             #region --- some checks
-
 
             if (oldSnapshot == null)
             {
@@ -234,7 +209,7 @@ namespace watchCode.helpers
                              $"{nameof(SnapshotHelper.CreateSnapshot)} instead, skipping");
                 return null;
             }
-            
+
             if (watchExpression.LineRange == null)
             {
                 Logger.Error($"tried to create a snapshot based on an old one but for the whole file, call " +
@@ -242,57 +217,22 @@ namespace watchCode.helpers
                 return null;
             }
 
-            if (oldSnapshot.LineRange != null && oldSnapshot.LineRange.Value.End > oldSnapshot.TotalLines)
-            {
-                Logger.Warn($"watch expression at: {watchExpression.GetDocumentationLocation()} has " +
-                            $"too large line range, watched file: {watchExpression.WatchExpressionFilePath} " +
-                            $"has actually only {oldSnapshot.TotalLines} lines in total");
-                
-                Logger.Warn($"update {watchExpression.GetDocumentationLocation()} to a valid line range: " +
-                            $"something between 1-{oldSnapshot.TotalLines} consider running init/update" +
-                            $"because the old snapshot has the wrong range stored");
-                
-                return null;
-            }
-
-            if (oldSnapshot.LineRange != null && oldSnapshot.LineRange.Value.End < oldSnapshot.LineRange.Value.Start)
-            {
-                Logger.Warn($"watch expression line range at: {watchExpression.GetDocumentationLocation()} " +
-                            $"has a larger end line number than start line number");
-            }
-
-            if (oldSnapshot.LineRange == null)
-            {
-                Logger.Error($"tried to create a snapshot based on an invalid range (null), call " +
-                             $"{nameof(SnapshotHelper.CreateSnapshot)} instead, skipping");
-                return null;
-            }
-            
-            if (oldSnapshot.LineRange.Value.Start <= 0)
-            {
-                Logger.Warn($"watch expression start line range at: {watchExpression.GetDocumentationLocation()} " +
-                            $"has < 1 value which is invalid, must be >= 1");
-                return null;
-            }
-            
-            if (oldSnapshot.LineRange.Value.End <= 0)
-            {
-                Logger.Warn($"watch expression end line range at: {watchExpression.GetDocumentationLocation()} " +
-                            $"has < 1 value which is invalid, must be >= 1");
-                return null;
-            }
-            
-            if (watchExpression.LineRange.Value.Start <= 0 || watchExpression.LineRange.Value.End <= 0 ||
-                watchExpression.LineRange.Value.End < watchExpression.LineRange.Value.Start)
+            if (watchExpression.LineRange.Start <= 0 || watchExpression.LineRange.End <= 0 ||
+                watchExpression.LineRange.End < watchExpression.LineRange.Start)
             {
                 //this can happen if the file is e.g. renamed... so jsut a warning
                 //the compare will be ok if because the new snapshot will be null
                 Logger.Warn(
                     $"could not create snapshot for file: {absoluteFilePath} because line range was " +
-                    $"invalide: start: {watchExpression.LineRange.Value.Start}, end: {watchExpression.LineRange.Value.End}, " +
+                    $"invalide: start: {watchExpression.LineRange.Start}, end: {watchExpression.LineRange.End}, " +
                     $"at doc file: {watchExpression.GetDocumentationLocation()}");
                 return null;
             }
+
+            oldSnapshot = CheckAndCorrectSnapshot(watchExpression, oldSnapshot);
+
+            if (oldSnapshot == null) return null;
+
 
             if (oldSnapshot.ReversedLineRange == null)
             {
@@ -326,144 +266,174 @@ namespace watchCode.helpers
             //file exists
 
             string line;
-            int count = 1;
+            int linesCount = 1;
 
-            var newSnapshot = new Snapshot(watchExpression.WatchExpressionFilePath, watchExpression.LineRange,
-                new List<string>());
+//            var newSnapshot = new Snapshot(watchExpression.WatchExpressionFilePath, watchExpression.LineRange,
+//                new List<string>());
+            List<string> lines = new List<string>();
+            Snapshot newSnapshot;
 
             try
             {
-                if (compressLines)
+                //use plain lines (compressLines == false)
+                //var lines = new string[watchExpression.LineRange.GetLength()];
+
+                #region --- normal top down
+
+                using (var sr = new StreamReader(File.Open(absoluteFilePath, FileMode.Open)))
                 {
-                    #region --- compress to one line
-
-                    StringBuilder builder = new StringBuilder();
-
-                    using (var sr = new StreamReader(File.Open(absoluteFilePath, FileMode.Open)))
+                    while ((line = sr.ReadLine()) != null)
                     {
-                        while ((line = sr.ReadLine()) != null)
+                        if (linesCount >= watchExpression.LineRange.Start &&
+                            linesCount <= watchExpression.LineRange.End)
                         {
-                            if (count >= watchExpression.LineRange.Value.Start &&
-                                count <= watchExpression.LineRange.Value.End)
-                            {
-                                builder.Append(line);
-                            }
-
-                            if (count > watchExpression.LineRange.Value.End) break;
-
-                            count++;
+                            lines.Add(line);
                         }
+                        linesCount++;
                     }
+                }
 
-                    string concatLines = builder.ToString();
-                    string hash = HashHelper.GetHash(concatLines);
-                    newSnapshot.Lines = new List<string>() {hash};
+                newSnapshot = new Snapshot(watchExpression.WatchExpressionFilePath, oldSnapshot.LineRange,
+                    oldSnapshot.ReversedLineRange, linesCount, lines);
 
-                    var areEqual = SnapshotWrapperHelper.AreSnapshotsEqual(oldSnapshot, newSnapshot);
+                #endregion
 
-                    if (areEqual == false)
+                var areEqual = SnapshotWrapperHelper.AreSnapshotsEqual(oldSnapshot, newSnapshot);
+
+                if (areEqual)
+                {
+                    snapshotsWereEqual = true;
+                    return newSnapshot;
+                }
+
+
+                #region --- check bottom to top (reverse line range)
+
+                //maybe the user only inserted lines above... check from bottom
+
+                Logger.Info($"created snapshot from old snapshot (from start) and was not equal, " +
+                            $"snapshot: {watchExpression.WatchExpressionFilePath}, " +
+                            $"doc file: {watchExpression.GetDocumentationLocation()}, " +
+                            $"using file bottom offset...");
+
+                //empty list but keep count
+                //if we have few lines now and we don't get the full range (user deleted lines
+                //and now the line range is outside of the file line range) then we would use some old
+                //lines from thhe top down pass through
+                lines = lines.Select(p => (string) null).ToList();
+
+                int count = 1;
+                {
+                    var sr = new ReverseLineReader(absoluteFilePath);
+
+                    foreach (var _line in sr)
                     {
-                        //maybe the user only inserted lines above... check from bottom
-                        builder.Clear();
-                        count = 1;
-
-                        newSnapshot.UsedBottomOffset = true;
-                        Logger.Info($"created snapshot from old snapshot (from start) and was not equal, " +
-                                    $"snapshot: {watchExpression.WatchExpressionFilePath}, " +
-                                    $"doc file: {watchExpression.GetDocumentationLocation()}, " +
-                                    $"using file bottom offset...");
-
-
+                        if (count >= oldSnapshot.ReversedLineRange.Start &&
+                            count <= oldSnapshot.ReversedLineRange.End)
                         {
-                            var sr = new ReverseLineReader(absoluteFilePath);
-
-                            foreach (var _line in sr)
-                            {
-                                if (count >= oldSnapshot.ReversedLineRange.Value.Start &&
-                                    count <= oldSnapshot.ReversedLineRange.Value.End)
-                                {
-                                    builder.Append(_line);
-                                }
-
-                                //we need the total lines
-                                //if (count > oldSnapshot.ReversedLineRange.Value.End) break;
-
-                                count++;
-                            }
+                            lines[lines.Count - (count - oldSnapshot.ReversedLineRange.Start) - 1] =
+                                _line;
                         }
 
-                        concatLines = builder.ToString();
-                        hash = HashHelper.GetHash(concatLines);
-                        newSnapshot.Lines = new List<string>() {hash};
-                    }
+                        //we already have the total lines count so we can stop early
+                        if (count > oldSnapshot.ReversedLineRange.End) break;
 
-                    #endregion
+                        count++;
+                    }
+                }
+
+                newSnapshot = new Snapshot(watchExpression.WatchExpressionFilePath, oldSnapshot.LineRange,
+                    oldSnapshot.ReversedLineRange, linesCount, lines);
+
+                newSnapshot.TriedBottomOffset = true;
+
+                #endregion
+
+
+                var areEqualFromBottom = SnapshotWrapperHelper.AreSnapshotsEqual(oldSnapshot, newSnapshot);
+
+                if (areEqualFromBottom)
+                {
+                    Logger.Info($"...bottom offset worked");
+                    snapshotsWereEqual = true;
+                    return newSnapshot;
+                }
+                
+                Logger.Info($"...bottom offset didn't work");
+
+                #region --- search through the whole file and try find the lines
+
+                //well the user could have inserted lines before and after the watched section/code...
+                //try to find the old lines (from the old snapshot) in the file
+                int equalLine = 0;
+                int newStartLine = 0;
+                
+                Logger.Info($"created snapshot from old snapshot (from start & end) and was not equal, " +
+                            $"snapshot: {watchExpression.WatchExpressionFilePath}, " +
+                            $"doc file: {watchExpression.GetDocumentationLocation()}, " +
+                            $"searching through file to find lines...");
+
+                lines.Clear();
+
+                count = 1;
+                using (var sr = new StreamReader(File.Open(absoluteFilePath, FileMode.Open)))
+                {
+                    while ((line = sr.ReadLine()) != null)
+                    {
+                        if (line == oldSnapshot.Lines[equalLine])
+                        {
+                            if (equalLine == 0) newStartLine = count;
+
+                            lines.Add(line);
+                            equalLine++; //found a subsequent equal line
+
+                            if (equalLine == oldSnapshot.Lines.Count)
+                            {
+                                //found all
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            if (equalLine > 0) //we already found equal lines
+                            {
+                                //but now this line don't match so not ALL lines match
+                                equalLine = 0;
+                                lines.Clear();
+                            }
+                        }
+                        count++;
+                    }
+                }
+
+                if (equalLine == oldSnapshot.Lines.Count)
+                {
+                    //found all lines...
+                    //store the new line range (only top because bottom will be automatically updated on doc update
+
+                    newSnapshot = new Snapshot(watchExpression.WatchExpressionFilePath,
+                        new LineRange(newStartLine, newStartLine + equalLine),
+                        oldSnapshot.ReversedLineRange, linesCount,
+                        oldSnapshot.Lines.ToList() //lines are equal
+                    );
+                    snapshotsWereEqual = true;
+                    
+                    Logger.Info($"...found lines somehwere in the file");
                 }
                 else
                 {
-                    //use plain lines (compressLines == false)
-                    var lines = new string[watchExpression.LineRange.Value.GetLength()];
-
-                    #region --- plain lines
-
-                    using (var sr = new StreamReader(File.Open(absoluteFilePath, FileMode.Open)))
-                    {
-                        while ((line = sr.ReadLine()) != null)
-                        {
-                            if (count >= watchExpression.LineRange.Value.Start &&
-                                count <= watchExpression.LineRange.Value.End)
-                            {
-                                lines[count - watchExpression.LineRange.Value.Start] = line;
-                            }
-
-
-                            if (count > watchExpression.LineRange.Value.End) break;
-
-                            count++;
-                        }
-                    }
-
-                    newSnapshot.Lines = lines.ToList();
-
-                    var areEqual = SnapshotWrapperHelper.AreSnapshotsEqual(oldSnapshot, newSnapshot);
-
-                    if (areEqual == false)
-                    {
-                        //maybe the user only inserted lines above... check from bottom
-
-                        newSnapshot.UsedBottomOffset = true;
-                        Logger.Info($"created snapshot from old snapshot (from start) and was not equal, " +
-                                    $"snapshot: {watchExpression.WatchExpressionFilePath}, " +
-                                    $"doc file: {watchExpression.GetDocumentationLocation()}, " +
-                                    $"using file bottom offset...");
-
-
-                        count = 1;
-                        lines = new string[oldSnapshot.ReversedLineRange.Value.GetLength()];
-
-                        {
-                            var sr = new ReverseLineReader(absoluteFilePath);
-
-                            foreach (var _line in sr)
-                            {
-                                if (count >= oldSnapshot.ReversedLineRange.Value.Start &&
-                                    count <= oldSnapshot.ReversedLineRange.Value.End)
-                                {
-                                    lines[lines.Length - (count - oldSnapshot.ReversedLineRange.Value.Start) - 1] =
-                                        _line;
-                                }
-
-                                //we need the total lines
-                                //if (count > oldSnapshot.ReversedLineRange.Value.End) break;
-
-                                count++;
-                            }
-                        }
-                        newSnapshot.Lines = lines.ToList();
-                    }
-
-                    #endregion
+                    newSnapshot = new Snapshot(watchExpression.WatchExpressionFilePath,
+                        new LineRange(newStartLine, oldSnapshot.LineRange.GetLength()),
+                        oldSnapshot.ReversedLineRange, linesCount,
+                        lines
+                    );
+                    
+                    Logger.Info($"...could not find lines in the file");
                 }
+                snapshotsWereEqual = false;
+                newSnapshot.TriedSearchFileOffset = true;
+
+                #endregion
             }
             catch (Exception e)
             {
@@ -472,10 +442,6 @@ namespace watchCode.helpers
                     $"at doc file: {watchExpression.GetDocumentationLocation()}");
                 return null;
             }
-
-            newSnapshot.SetReverseLineRange(
-                new LineRange(oldSnapshot.ReversedLineRange.Value.Start, oldSnapshot.ReversedLineRange.Value.End),
-                count);
 
             return newSnapshot;
         }

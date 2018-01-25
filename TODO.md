@@ -11,6 +11,7 @@
 
 - dump log
 
+- check if every config option is accessible via cmd arg & also applied!
 
 
 - reduce expressions if y includes x and x changed --> y changed! but if x does not change we don't know for y

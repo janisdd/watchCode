@@ -16,10 +16,8 @@ namespace watchCode.helpers
         private static bool insideRootDir = false;
         private static bool insideNoReduce = false;
         private static bool insideNoCombineSnapshots = false;
-        private static bool insideNoCompressLines = false;
         private static bool insideHashAlgorithmToUse = false;
         private static bool insideConfigFileName = false;
-        private static bool insideAlsoUseReverseLines = false;
         private static bool insideFilesToIgnore = false;
         private static bool insideDirsToIgnore = false;
         private static bool insideNotUseInMemoryStringBuilderFileForUpdateingDocs = false;
@@ -71,11 +69,6 @@ namespace watchCode.helpers
                         continue;
                         break;
                         
-                    case ParameterStart + "plainLines":
-                        ResetInsideArgs();
-                        insideNoCompressLines = true;
-                        continue;
-                        break;
                         
                     case ParameterStart + "hashAlgo":
                         ResetInsideArgs();
@@ -107,11 +100,6 @@ namespace watchCode.helpers
                         continue;
                         break;
                         
-                    case ParameterStart + "alsoUseReverseLines":
-                        ResetInsideArgs();
-                        insideAlsoUseReverseLines = true;
-                        continue;
-                        break;
                         
                     case ParameterStart + "ignoreFile":
                     case ParameterStart + "ignoreFiles":
@@ -155,9 +143,7 @@ namespace watchCode.helpers
                 if (insideRootDir) config.RootDir = arg;
                 if (insideNoReduce) config.ReduceWatchExpressions = false;
                 if (insideNoCombineSnapshots) config.CombineSnapshotFiles = false;
-                if (insideNoCompressLines) config.CompressLines = false;
                 if (insideHashAlgorithmToUse) config.HashAlgorithmToUse = arg;
-                if (insideAlsoUseReverseLines) config.AlsoUseReverseLines = true;
                 if (insideFilesToIgnore) config.FilesToIgnore.Add(arg);
                 if (insideDirsToIgnore) config.DirsToIgnore.Add(arg);
                 if (insideNotUseInMemoryStringBuilderFileForUpdateingDocs)
@@ -182,10 +168,8 @@ namespace watchCode.helpers
             insideRootDir = false;
             insideNoReduce = false;
             insideNoCombineSnapshots = false;
-            insideNoCompressLines = false;
             insideHashAlgorithmToUse = false;
             insideConfigFileName = false;
-            insideAlsoUseReverseLines = false;
             insideFilesToIgnore = false;
             insideDirsToIgnore = false;
             insideNotUseInMemoryStringBuilderFileForUpdateingDocs = false;

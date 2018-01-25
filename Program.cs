@@ -2,9 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices.ComTypes;
-using System.Security.Cryptography;
-using Newtonsoft.Json;
 using watchCode.helpers;
 using watchCode.model;
 
@@ -34,8 +31,8 @@ namespace watchCode
             BootstrapHelper.Bootstrap(cmdArgs, config);
 
             //cmdArgs.Init = true;
-            cmdArgs.Update = true;
-//            cmdArgs.Compare = true;
+//            cmdArgs.Update = true;
+            cmdArgs.Compare = true;
 
             //after updating docs all bottom to top snapshots are invalid (ranges)
             //after the docs update we don't know which snapshot belongs to which doc watch expression...
@@ -43,15 +40,13 @@ namespace watchCode
             //TODO maybe update the snapshots with the docs because the content of the snapshot won't change
             //only the line numbers...
 
-            cmdArgs.CompareAndUpdateDocs = true;
+            //cmdArgs.CompareAndUpdateDocs = true;
 
-            config.AlsoUseReverseLines = true;
-
-            config.CompressLines = false;
 
             config.DirsToIgnore.Add(DynamicConfig.GetAbsoluteWatchCodeDirPath(config.WatchCodeDirName));
 
-            if (Config.Validate(config, cmdArgs) == false)
+
+            if (Config.Validate(config, cmdArgs) == false) //this also checks if all files exists
             {
                 Logger.Error("config was invalid, exitting");
                 PrintHelp();
@@ -61,9 +56,11 @@ namespace watchCode
 
             #region --- get all doc files that could contain watch expressions 
 
+            //this also checks if files exists... in case we use it without calling validate before
             var allDocFileInfos = FileIteratorHelper.GetAllFiles(config.Files, config.Dirs,
-                DynamicConfig.KnownFileExtensionsWithoutExtension.Keys.ToList(), true, config.FilesToIgnore,
-                config.DirsToIgnore);
+                DynamicConfig.KnownFileExtensionsWithoutExtension.Keys.ToList(), config.RecursiveCheckDirs.Value,
+                config.FilesToIgnore,
+                config.DirsToIgnore, config.IgnoreHiddenFiles.Value);
 
             #endregion
 
@@ -89,7 +86,8 @@ namespace watchCode
                 Logger.Warn("no watch expressions found");
             }
 
-            //make sure we don't watch the same (source) lines in the same doc file...
+            //make sure we don't watch the same (source) lines in the same doc file rang...
+            //e.g. if a doc file has 1 watch expression with >= 2 expressions watching the same source file range
 
             allWatchExpressions = allWatchExpressions
                 .DistinctBy(p => p.GetFullIdentifier())
@@ -269,8 +267,7 @@ namespace watchCode
                         //do not save the snapshot ... maybe we get snapshots for the same file...
                         // ReSharper disable once PossibleInvalidOperationException
                         var newSnapshot =
-                            SnapshotWrapperHelper.CreateSnapshot(watchExpression, !config.CompressLines.Value,
-                                config.AlsoUseReverseLines.Value);
+                            SnapshotWrapperHelper.CreateSnapshot(watchExpression);
 
                         //inner func should have reported the error
                         if (newSnapshot == null) return;
@@ -319,7 +316,7 @@ namespace watchCode
                 //create and save new snapshot
                 // ReSharper disable once PossibleInvalidOperationException
                 SnapshotWrapperHelper.CreateAndSaveSnapshot(watchExpression, config.WatchCodeDirName,
-                    config.SnapshotDirName, config.CompressLines.Value, config.AlsoUseReverseLines.Value);
+                    config.SnapshotDirName);
 
                 Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
                             $"was created at: " +
@@ -341,8 +338,7 @@ namespace watchCode
                 {
                     // ReSharper disable once PossibleInvalidOperationException
                     var newSnapshot =
-                        SnapshotWrapperHelper.CreateSnapshot(watchExpression, config.CompressLines.Value,
-                            config.AlsoUseReverseLines.Value);
+                        SnapshotWrapperHelper.CreateSnapshot(watchExpression);
 
                     if (newSnapshot != null &&
                         snapshotsDictionary.TryGetValue(watchExpression.WatchExpressionFilePath, out var snapshots))
@@ -374,7 +370,7 @@ namespace watchCode
                 //create and save new snapshot
                 // ReSharper disable once PossibleInvalidOperationException
                 SnapshotWrapperHelper.CreateAndSaveSnapshot(watchExpression, config.WatchCodeDirName,
-                    config.SnapshotDirName, config.CompressLines.Value, config.AlsoUseReverseLines.Value);
+                    config.SnapshotDirName);
 
                 Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
                             $"was saved at: " +
@@ -412,7 +408,8 @@ namespace watchCode
 
                         oldSnapshot = oldSnapshots?.FirstOrDefault(p =>
                             p.LineRange == watchExpression.LineRange || (
-                                p.ReversedLineRange != null && DocsHelper.GetNewLineRange(watchExpression, p) ==
+                                p.ReversedLineRange != null && 
+                                DocsHelper.GetNewLineRangeFromReverseLineRange(p) ==
                                 watchExpression.LineRange));
                     }
                 }
@@ -431,8 +428,7 @@ namespace watchCode
                 {
                     //normally this can't happen ... because we created the snapshot...
                     //but on error or if someone deleted the snapshot in the snapshot dir...
-                    areEqual = false;
-                    equalMap.Add(watchExpression, (areEqual, oldSnapshot, newSnapshot));
+                    equalMap.Add(watchExpression, (false, null, null));
 
                     return;
                 }
@@ -443,8 +439,9 @@ namespace watchCode
 
                     // ReSharper disable once PossibleInvalidOperationException
                     newSnapshot =
-                        SnapshotWrapperHelper.CreateSnapshot(watchExpression, config.CompressLines.Value,
-                            config.AlsoUseReverseLines.Value);
+                        SnapshotWrapperHelper.CreateSnapshot(watchExpression);
+
+                    areEqual = SnapshotWrapperHelper.AreSnapshotsEqual(oldSnapshot, newSnapshot);
                 }
                 else
                 {
@@ -452,19 +449,20 @@ namespace watchCode
 
                     // ReSharper disable once PossibleInvalidOperationException
                     newSnapshot =
-                        SnapshotWrapperHelper.CreateSnapshotBasedOnOldSnapshot(watchExpression,
-                            config.CompressLines.Value, oldSnapshot, config.AlsoUseReverseLines.Value);
+                        SnapshotWrapperHelper.CreateSnapshotBasedOnOldSnapshot(watchExpression, oldSnapshot,
+                            out var snapshotsWereEqual);
+
+                    areEqual = snapshotsWereEqual;
                 }
 
 
                 if (newSnapshot == null)
                 {
-                    areEqual = false;
-                    equalMap.Add(watchExpression, (areEqual, oldSnapshot, null));
+                    equalMap.Add(watchExpression, (false, oldSnapshot, null));
                 }
                 else
                 {
-                    areEqual = SnapshotWrapperHelper.AreSnapshotsEqual(oldSnapshot, newSnapshot);
+                    //already checked in CreateSnapshotBasedOnOldSnapshot
                     equalMap.Add(watchExpression,
                         (areEqual, oldSnapshot, newSnapshot));
                 }
@@ -476,12 +474,12 @@ namespace watchCode
 
         private static void OutputEqualsResults(
             Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap,
-            out bool someSnapshotChanged, out bool someSnapshotUsedBottomToTopLines, bool suppressOutput)
+            out bool someSnapshotChanged, out bool someSnapshotUsedBottomToTopOrSearchLines, bool suppressOutput)
         {
             WatchExpression watchExpression;
 
             someSnapshotChanged = false;
-            someSnapshotUsedBottomToTopLines = false;
+            someSnapshotUsedBottomToTopOrSearchLines = false;
 
             foreach (var pair in equalMap)
             {
@@ -494,9 +492,9 @@ namespace watchCode
 
                 if (tuple.wasEqual)
                 {
-                    if (tuple.newSnapshot.UsedBottomOffset)
+                    if (tuple.newSnapshot.TriedBottomOffset)
                     {
-                        someSnapshotUsedBottomToTopLines = true;
+                        someSnapshotUsedBottomToTopOrSearchLines = true;
 
                         Logger.Info(
                             $"snapshots are equal! file name: {watchExpression.WatchExpressionFilePath}, range from bottom: {tuple.newSnapshot.ReversedLineRange}");
@@ -507,6 +505,25 @@ namespace watchCode
                             Console.Write(watchExpression.WatchExpressionFilePath);
                             Console.ResetColor();
                             Console.Write(" lines inserted before, update line range --> ");
+                            Console.ForegroundColor = ConsoleColor.DarkGreen;
+                            Console.Write(watchExpression.GetDocumentationLocation());
+                            Console.WriteLine();
+                            Console.ResetColor();
+                        }
+                    }
+                    else if (tuple.newSnapshot.TriedSearchFileOffset)
+                    {
+                        someSnapshotUsedBottomToTopOrSearchLines = true;
+
+                        Logger.Info(
+                            $"snapshots are equal! file name: {watchExpression.WatchExpressionFilePath}, found new range (via searching): {tuple.newSnapshot.ReversedLineRange}");
+
+                        if (suppressOutput == false)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.Write(watchExpression.WatchExpressionFilePath);
+                            Console.ResetColor();
+                            Console.Write(" lines inserted before & after, update line range --> ");
                             Console.ForegroundColor = ConsoleColor.DarkGreen;
                             Console.Write(watchExpression.GetDocumentationLocation());
                             Console.WriteLine();
@@ -542,7 +559,7 @@ namespace watchCode
             }
 
 
-            if (someSnapshotChanged == false && someSnapshotUsedBottomToTopLines == false)
+            if (someSnapshotChanged == false && someSnapshotUsedBottomToTopOrSearchLines == false)
             {
                 if (suppressOutput == false)
                 {
@@ -569,15 +586,32 @@ namespace watchCode
                 var tuples = group.ToList();
 
                 //we need equal --> else we need manual update
-                //and we need used bottom else nothing to update
-                if (tuples.Any(p => p.Value.wasEqual && p.Value.newSnapshot.UsedBottomOffset) == false) continue;
-                
+                //if we used bottom or search the doc file must be updated (the line range)
+                if (tuples.Any(p =>
+                    p.Value.wasEqual &&
+                    (p.Value.newSnapshot.TriedBottomOffset || p.Value.newSnapshot.TriedSearchFileOffset) ==
+                    false))
+                {
+                    continue;
+                }
+
                 //here at least 1 in the same doc location (and watch expression position) changed
                 //so update the whole expression (keep the not changed values but update where UsedBottomOffset)
-               
+
                 var expressionAndSnapshotTuples = tuples
                     .Select(p => (p.Key, p.Value.wasEqual, p.Value.newSnapshot)).ToList();
 
+                /*
+                 * case 1:
+                 *     we used bottom to top (reverse line range) & found lines --> UsedBottomOffset == true
+                 * 
+                 * --> we need to update the line range
+                 *
+                 * case 2:
+                 *     we searched the file for the lines & found them --> UsedSearchFileOffset == true
+                 *
+                 * --> we need update the line range... luckily the newSnapshot has the right line range
+                 */
                 var updated = DocsHelper.UpdateWatchExpressionInDocFile(expressionAndSnapshotTuples,
                     DynamicConfig.KnownFileExtensionsWithoutExtension, DynamicConfig.InitWatchExpressionKeywords,
                     config);

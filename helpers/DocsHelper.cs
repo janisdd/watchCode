@@ -177,9 +177,11 @@ namespace watchCode.helpers
 
                         // ReSharper disable once PossibleInvalidOperationException
                         builder.Append(
-                            tuple.wasEqual && tuple.snapshot.UsedBottomOffset //if not take old range
+                            tuple.wasEqual &&
+                            (tuple.snapshot.TriedBottomOffset ||
+                             tuple.snapshot.TriedSearchFileOffset) //if not take old range
                                 ? GetNewLineRange(tuple.watchExpression, tuple.snapshot).ToShortString()
-                                : tuple.watchExpression.LineRange.Value.ToShortString()
+                                : tuple.watchExpression.LineRange.ToShortString()
                         );
 
                         continue;
@@ -190,9 +192,11 @@ namespace watchCode.helpers
 
                     // ReSharper disable once PossibleInvalidOperationException
                     builder.Append(
-                        tuple.wasEqual && tuple.snapshot.UsedBottomOffset //if not take old range
+                        tuple.wasEqual &&
+                        (tuple.snapshot.TriedBottomOffset ||
+                         tuple.snapshot.TriedSearchFileOffset) //if not take old range
                             ? GetNewLineRange(tuple.watchExpression, tuple.snapshot).ToShortString()
-                            : tuple.watchExpression.LineRange.Value.ToShortString()
+                            : tuple.watchExpression.LineRange.ToShortString()
                     );
                 }
             }
@@ -242,7 +246,6 @@ namespace watchCode.helpers
                                         sw.WriteLine();
                                     }
                                 }
-                               
                             }
                             else
                             {
@@ -306,18 +309,42 @@ namespace watchCode.helpers
             return true;
         }
 
+        public static LineRange GetNewLineRangeFromReverseLineRange(Snapshot snapshot)
+        {
+            return new LineRange(
+                snapshot.TotalLinesInFile - snapshot.ReversedLineRange.End,
+                snapshot.TotalLinesInFile - snapshot.ReversedLineRange.Start);
+        }
+
         public static LineRange GetNewLineRange(WatchExpression watchExpression, Snapshot snapshot)
         {
-            if (snapshot.ReversedLineRange == null)
-            {
-                throw new ArgumentNullException($"to calculate the new line rang we need " +
-                                                $"{snapshot}.{snapshot.ReversedLineRange}");
-            }
-            ;
+            LineRange newLineRange = null;
 
-            LineRange newLineRange = new LineRange(
-                snapshot.TotalLines - snapshot.ReversedLineRange.Value.End,
-                snapshot.TotalLines - snapshot.ReversedLineRange.Value.Start);
+            if (snapshot.TriedBottomOffset)
+            {
+                if (snapshot.ReversedLineRange == null)
+                {
+                    throw new ArgumentNullException($"to calculate the new line rang we need " +
+                                                    $"{snapshot}.{snapshot.ReversedLineRange}");
+                }
+
+                newLineRange = new LineRange(
+                    snapshot.TotalLinesInFile - snapshot.ReversedLineRange.End,
+                    snapshot.TotalLinesInFile - snapshot.ReversedLineRange.Start);
+            }
+
+            else if (snapshot.TriedSearchFileOffset)
+            {
+                newLineRange = new LineRange(
+                    snapshot.LineRange.Start,
+                    snapshot.LineRange.End);
+            }
+            else
+            {
+                throw new NotImplementedException("tried to update docs but neither TriedBottomOffset " +
+                                                  "nor TriedSearchFileOffset was used...");
+            }
+
 
             return newLineRange;
         }

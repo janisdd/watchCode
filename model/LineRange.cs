@@ -1,10 +1,17 @@
-﻿namespace watchCode.model
+﻿using System;
+
+namespace watchCode.model
 {
-    public struct LineRange
+    public class LineRange
     {
         public int Start { get; set; }
         public int End { get; set; }
 
+        [Obsolete("do not use, only here because of json deserialization")]
+        public LineRange()
+        {
+            
+        }
         public LineRange(int start, int end)
         {
             Start = start;
@@ -19,6 +26,10 @@
 
         public static bool operator ==(LineRange lr1, LineRange lr2)
         {
+            if ((object)lr1 == null && (object)lr2 == null) return true;
+
+            if ((object)lr1 == null || (object)lr2 == null) return false;
+            
             return lr1.Start == lr2.Start && lr1.End == lr2.End;
         }
 

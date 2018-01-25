@@ -58,7 +58,7 @@ namespace watchCode.helpers
                             var plainExpressionText = commentText.Substring(watchExpressionKeyword.Length);
 
                             var expressions = GetWatchExpressions(plainExpressionText, docFileInfo,
-                                expressionLocation.Value);
+                                expressionLocation);
                             watchExpressions.AddRange(expressions);
                         }
                     }
@@ -69,7 +69,7 @@ namespace watchCode.helpers
             return watchExpressions;
         }
 
-        private static LineRange? GetLineRangeFromIndices(string text, int startIndex, int length)
+        private static LineRange GetLineRangeFromIndices(string text, int startIndex, int length)
         {
             int line = 1;
             int startLine = -1;
@@ -191,7 +191,7 @@ namespace watchCode.helpers
             }
 
 
-            LineRange? lineRang = null;
+            LineRange lineRang = null;
             var filePath = builder.ToString();
 
             if (filePath.Length == 0)
@@ -236,7 +236,7 @@ namespace watchCode.helpers
                 watchExpressionFoundLineRange);
         }
 
-        private static LineRange? ParseLineRange(string possibleLineRang, FileInfo fileInfo, bool suppressWarnings)
+        private static LineRange ParseLineRange(string possibleLineRang, FileInfo fileInfo, bool suppressWarnings)
         {
             possibleLineRang = possibleLineRang.Trim();
 

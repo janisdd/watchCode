@@ -7,22 +7,26 @@ namespace watchCode.helpers
 {
     public static class FileIteratorHelper
     {
-        public static List<FileInfo> GetAllFiles(List<string> files, List<string> dirs, List<string> filterByExtensions,
-            bool recursiveCheckDirs, List<string> absoluteFilePathsToIgnore, List<string> absoluteDirPathsToIgnore)
+        public static string HiddenFileStartWithString = ".";
+
+        public static List<FileInfo> GetAllFiles(List<string> files, List<string> dirs, List<string> whiteListFilterByExtensions,
+            bool recursiveCheckDirs, List<string> absoluteFilePathsToIgnore, List<string> absoluteDirPathsToIgnore,
+            bool ignoreHiddenFiles)
         {
             List<FileInfo> fileInfos = new List<FileInfo>(files.Count);
 
-            fileInfos.AddRange(GetAllFiles(files, filterByExtensions, absoluteFilePathsToIgnore,
-                absoluteDirPathsToIgnore));
+            fileInfos.AddRange(GetAllFiles(files, whiteListFilterByExtensions, absoluteFilePathsToIgnore,
+                absoluteDirPathsToIgnore, ignoreHiddenFiles));
 
-            fileInfos.AddRange(GetAllFilesInDirs(dirs, filterByExtensions, recursiveCheckDirs,
-                absoluteFilePathsToIgnore, absoluteDirPathsToIgnore));
+            fileInfos.AddRange(GetAllFilesInDirs(dirs, whiteListFilterByExtensions, recursiveCheckDirs,
+                absoluteFilePathsToIgnore, absoluteDirPathsToIgnore, ignoreHiddenFiles));
 
             return fileInfos;
         }
 
         private static List<FileInfo> GetAllFilesInDirs(List<string> dirs, List<string> filterByExtensions,
-            bool recursiveCheckDirs, List<string> absoluteFilePathsToIgnore, List<string> absoluteDirPathsToIgnore)
+            bool recursiveCheckDirs, List<string> absoluteFilePathsToIgnore, List<string> absoluteDirPathsToIgnore,
+            bool ignoreHiddenFiles)
         {
             var dirInfos = new List<DirectoryInfo>();
 
@@ -52,34 +56,34 @@ namespace watchCode.helpers
             }
 
             return GetAllFilesInDirs(dirInfos, filterByExtensions, recursiveCheckDirs, absoluteFilePathsToIgnore,
-                absoluteDirPathsToIgnore);
+                absoluteDirPathsToIgnore, ignoreHiddenFiles);
         }
 
 
         private static List<FileInfo> GetAllFilesInDirs(IEnumerable<DirectoryInfo> dirs,
             List<string> filterByExtensions, bool recursiveCheckDirs, List<string> absoluteFilePathsToIgnore,
-            List<string> absoluteDirPathsToIgnore)
+            List<string> absoluteDirPathsToIgnore, bool ignoreHiddenFiles)
         {
             List<FileInfo> fileInfos = new List<FileInfo>();
 
             foreach (var directoryInfo in dirs)
             {
                 fileInfos.AddRange(GetAllFiles(directoryInfo.GetFiles(), filterByExtensions, absoluteFilePathsToIgnore,
-                    absoluteDirPathsToIgnore));
+                    absoluteDirPathsToIgnore, ignoreHiddenFiles));
 
                 if (recursiveCheckDirs == false) continue;
 
                 var subDirs = directoryInfo.GetDirectories();
                 var subDirFiles = GetAllFilesInDirs(subDirs, filterByExtensions, recursiveCheckDirs,
-                    absoluteFilePathsToIgnore, absoluteDirPathsToIgnore);
+                    absoluteFilePathsToIgnore, absoluteDirPathsToIgnore, ignoreHiddenFiles);
                 fileInfos.AddRange(subDirFiles);
             }
 
             return fileInfos;
         }
 
-        private static List<FileInfo> GetAllFiles(List<string> files, List<string> filterByExtensions,
-            List<string> absoluteFilePathsToIgnore, List<string> absoluteDirPathsToIgnore)
+        private static List<FileInfo> GetAllFiles(List<string> files, List<string> whiteListFilterByExtensions,
+            List<string> absoluteFilePathsToIgnore, List<string> absoluteDirPathsToIgnore, bool ignoreHiddenFiles)
         {
             List<FileInfo> fileInfos = new List<FileInfo>(files.Count);
             for (int i = 0; i < files.Count; i++)
@@ -89,6 +93,27 @@ namespace watchCode.helpers
                 try
                 {
                     FileInfo fileInfo = new FileInfo(absoluteFilePath);
+
+                    if (!fileInfo.Exists)
+                    {
+                        Logger.Warn($"file does not exist: {fileInfo.FullName}");
+                        continue;
+                    }
+
+                    //disallow empty extension 
+                    if (fileInfo.Extension.Length == 0 ||
+                        whiteListFilterByExtensions.Contains(fileInfo.Extension.Substring(1)) == false)
+                    {
+                        Logger.Info($"ignoring file because of extension filter: {fileInfo.FullName}");
+                        continue;
+                    }
+
+                    if (fileInfo.Name.StartsWith(HiddenFileStartWithString))
+                    {
+                        Logger.Warn($"ignoring file because hidden: {fileInfo.FullName}");
+                        continue;
+                    }
+
                     fileInfos.Add(fileInfo);
                 }
                 catch (Exception e)
@@ -96,12 +121,13 @@ namespace watchCode.helpers
                     Logger.Warn($"could not get file info for file: {absoluteFilePath}, error: {e.Message}");
                 }
             }
-            return GetAllFiles(fileInfos, filterByExtensions, absoluteFilePathsToIgnore, absoluteDirPathsToIgnore);
+            return GetAllFiles(fileInfos, whiteListFilterByExtensions, absoluteFilePathsToIgnore, absoluteDirPathsToIgnore,
+                ignoreHiddenFiles);
         }
 
 
-        private static List<FileInfo> GetAllFiles(IEnumerable<FileInfo> files, List<string> filterByExtensions,
-            List<string> absoluteFilePathsToIgnore, List<string> absoluteDirPathsToIgnore)
+        private static List<FileInfo> GetAllFiles(IEnumerable<FileInfo> files, List<string> whiteListFilterByExtensions,
+            List<string> absoluteFilePathsToIgnore, List<string> absoluteDirPathsToIgnore, bool ignoreHiddenFiles)
         {
             List<FileInfo> fileInfos = new List<FileInfo>();
 
@@ -109,7 +135,7 @@ namespace watchCode.helpers
             {
                 if (!fileInfo.Exists)
                 {
-                    Logger.Warn($"file not exists: {fileInfo.FullName}");
+                    Logger.Warn($"file does not exist: {fileInfo.FullName}");
                     continue;
                 }
 
@@ -128,15 +154,21 @@ namespace watchCode.helpers
                 //check extension
 
                 //disallow empty extension 
-                if (fileInfo.Extension.Length > 0 && filterByExtensions.Contains(fileInfo.Extension.Substring(1)))
+                if (fileInfo.Extension.Length == 0 ||
+                    whiteListFilterByExtensions.Contains(fileInfo.Extension.Substring(1)) == false)
                 {
-                    fileInfos.Add(fileInfo);
-                    Logger.Info($"added file {fileInfo.FullName}");
+                    Logger.Info($"ignoring file because of extension filter: {fileInfo.FullName}");
                     continue;
                 }
 
+                if (fileInfo.Name.StartsWith(HiddenFileStartWithString))
+                {
+                    Logger.Warn($"ignoring file because hidden: {fileInfo.FullName}");
+                    continue;
+                }
 
-                Logger.Info($"ignoring file because of extension filter: {fileInfo.FullName}");
+                fileInfos.Add(fileInfo);
+                Logger.Info($"added file {fileInfo.FullName}");
             }
 
             return fileInfos;

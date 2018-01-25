@@ -3,7 +3,7 @@
     public struct WatchExpression : ISnapshotLike
     {
         public string WatchExpressionFilePath { get; set; }
-        public LineRange? LineRange { get; set; }
+        public LineRange LineRange { get; set; }
 
         /// <summary>
         /// the file path (documentation file) where we found the watch expression
@@ -17,7 +17,7 @@
         public LineRange DocumentationLineRange { get; set; }
 
 
-        public WatchExpression(string watchExpressionFilePath, LineRange? lineRange, string documentationFilePath,
+        public WatchExpression(string watchExpressionFilePath, LineRange lineRange, string documentationFilePath,
             LineRange documentationLineRange)
         {
             WatchExpressionFilePath = watchExpressionFilePath;
@@ -39,7 +39,7 @@
                 return WatchExpressionFilePath;
             }
 
-            return WatchExpressionFilePath + "_" + LineRange.Value.Start + "-" + LineRange.Value.End;
+            return WatchExpressionFilePath + "_" + LineRange.Start + "-" + LineRange.End;
         }
 
  
@@ -65,8 +65,8 @@
 
 
             //range y is included in x range
-            if (LineRange.Value.Start <= y.LineRange.Value.Start &&
-                LineRange.Value.End >= y.LineRange.Value.End)
+            if (LineRange.Start <= y.LineRange.Start &&
+                LineRange.End >= y.LineRange.End)
             {
                 return true;
             }
@@ -80,7 +80,7 @@
             {
                 return WatchExpressionFilePath;
             }
-            return WatchExpressionFilePath + ", " + LineRange.Value.Start + "-" + LineRange.Value.End;
+            return WatchExpressionFilePath + ", " + LineRange.Start + "-" + LineRange.End;
         }
 
         public string GetFullIdentifier()
@@ -91,7 +91,7 @@
                        "_" + WatchExpressionFilePath;
             }
             return DocumentationFilePath + ", " + DocumentationLineRange.Start + "-" + DocumentationLineRange.End +
-                   "_" + WatchExpressionFilePath + ", " + LineRange.Value.Start + "-" + LineRange.Value.End;
+                   "_" + WatchExpressionFilePath + ", " + LineRange.Start + "-" + LineRange.End;
             ;
         }
 

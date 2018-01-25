@@ -43,11 +43,6 @@ namespace watchCode.model
         /// </summary>
         public bool? CombineSnapshotFiles { get; set; }
 
-        /// <summary>
-        /// true: use the real lines to compare snapshots
-        /// false: use (md5) hash of the lines
-        /// </summary>
-        public bool? CompressLines { get; set; }
 
         /// <summary>
         /// see <see cref="HashHelper.SetHashAlgorithm"/> for supported algorithms
@@ -77,7 +72,7 @@ namespace watchCode.model
         public string DumpWatchExpressionsFileName { get; set; }
 
 
-        public bool? AlsoUseReverseLines { get; set; }
+        public bool? IgnoreHiddenFiles { get; set; }
 
         
         /// <summary>
@@ -175,12 +170,11 @@ namespace watchCode.model
             CreateWatchExpressionsDumpFile = true,
             RecursiveCheckDirs = true,
             ReduceWatchExpressions = false,
+            IgnoreHiddenFiles = true,
             CombineSnapshotFiles = true,
-            CompressLines = true,
             RootDir = "",
             UseInMemoryStringBuilderFileForUpdateingDocs = true,
             HashAlgorithmToUse = HashHelper.DefaultHashAlgorithmName,
-            AlsoUseReverseLines = false,
             InitWatchExpressionKeywords = new List<string>(),
             KnownFileExtensionsWithoutExtension = new Dictionary<string, List<(string start, string end)>>(),
         };

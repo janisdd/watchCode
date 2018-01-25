@@ -7,35 +7,38 @@ namespace watchCode.helpers
     {
         public static bool prettyPrintSnapshots = true;
 
-        public static Snapshot CreateSnapshot(WatchExpression watchExpression, bool compressLines,
-            bool alsoUseReverseLines)
+        public static Snapshot CreateSnapshot(WatchExpression watchExpression)
         {
             //create snapshot
             string path = DynamicConfig.GetAbsoluteFilePath(watchExpression.WatchExpressionFilePath);
             var snapshot =
-                SnapshotHelper.CreateSnapshot(path, watchExpression, compressLines, alsoUseReverseLines);
+                SnapshotHelper.CreateSnapshot(path, watchExpression);
 
             return snapshot;
         }
 
 
-
-        public static Snapshot CreateSnapshotBasedOnOldSnapshot(WatchExpression watchExpression, bool compressLines,
-            Snapshot oldSnapshot, bool alsoUseReverseLines)
+        public static Snapshot CreateSnapshotBasedOnOldSnapshot(WatchExpression watchExpression,
+            Snapshot oldSnapshot, out bool snapshotsWereEqual)
         {
             //create snapshot
             string path = DynamicConfig.GetAbsoluteFilePath(watchExpression.WatchExpressionFilePath);
 
-            if (watchExpression.LineRange == null || alsoUseReverseLines == false)
+            if (watchExpression.LineRange == null)
             {
                 //we need to read the whole file so no difference using stream indices...
                 //or we don't check from bottom so CreateSnapshotBasedOnOldSnapshot would do the same as CreateSnapshot
-                return SnapshotHelper.CreateSnapshot(path, watchExpression, compressLines, alsoUseReverseLines);
+                var newSnapshot = SnapshotHelper.CreateSnapshot(path, watchExpression);
+
+                snapshotsWereEqual = AreSnapshotsEqual(oldSnapshot, newSnapshot);
+
+                return newSnapshot;
             }
 
 
             var snapshot =
-                SnapshotHelper.CreateSnapshotBasedOnOldSnapshot(path, watchExpression, compressLines, oldSnapshot);
+                SnapshotHelper.CreateSnapshotBasedOnOldSnapshot(path, watchExpression, oldSnapshot,
+                    out snapshotsWereEqual);
 
             return snapshot;
         }
@@ -49,13 +52,7 @@ namespace watchCode.helpers
             {
                 if (oldSnapshot.WatchExpressionFilePath != newSnapshot.WatchExpressionFilePath) return false;
 
-                if (oldSnapshot.LineRange.HasValue != newSnapshot.LineRange.HasValue) return false;
-
-
-                if (oldSnapshot.LineRange.HasValue && newSnapshot.LineRange.HasValue)
-                {
-                    if (oldSnapshot.LineRange.Value != newSnapshot.LineRange.Value) return false;
-                }
+                if (oldSnapshot.LineRange != newSnapshot.LineRange) return false;
             }
 
             //this cannot happen if the watch expression not change
@@ -86,9 +83,9 @@ namespace watchCode.helpers
         }
 
         public static bool CreateAndSaveSnapshot(WatchExpression watchExpression, string watchCodeDirName,
-            string snapshotDirName, bool compressLines, bool alsoUseReverseLines)
+            string snapshotDirName)
         {
-            var snapShot = CreateSnapshot(watchExpression, compressLines, alsoUseReverseLines);
+            var snapShot = CreateSnapshot(watchExpression);
 
             return SaveSnapshot(snapShot, watchCodeDirName, snapshotDirName);
         }
