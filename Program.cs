@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using watchCode.helpers;
@@ -13,24 +14,45 @@ namespace watchCode
         public const int NotEqualCompareReturnCode = 1;
         public const int NeedToUpdateDocRanges = 2;
         public const int ErrorReturnCode = 100;
+        
+        public static Stopwatch Stopwatch = new Stopwatch();
+        public static Stopwatch TotalStopwatch = new Stopwatch();
 
         static int Main(string[] args)
         {
+            TotalStopwatch.Start();
+            Logger.OutputLogToConsole = true;
+            
+            Logger.Info($"--- bootstrapping ---");
+            Stopwatch.Start();
+            
             DynamicConfig.AbsoluteRootDirPath = Directory.GetCurrentDirectory();
 
             var (cmdArgs, config) = CmdArgsHelper.ParseArgs(args);
 
-            Logger.OutputLogToConsole = true;
+            //some checking 
+            BootstrapHelper.Bootstrap(cmdArgs, config);
+            
+            Stopwatch.Stop();
+            Logger.Info($"--- end bootstrapping (took {StopWatchHelper.GetElapsedTime(Stopwatch)}) ---");
 
-            return Run(cmdArgs, config);
+            int returnCode = Run(cmdArgs, config);
+            
+            TotalStopwatch.Stop();
+            
+            //Logger.Info("---");
+            Logger.Info($"total time: {StopWatchHelper.GetElapsedTime(TotalStopwatch)}");
+            
+            return returnCode;
         }
 
 
         public static int Run(CmdArgs cmdArgs, Config config)
         {
             int returnCode = OkReturnCode;
-            //some checking 
-            BootstrapHelper.Bootstrap(cmdArgs, config);
+            
+            
+            
 
             //cmdArgs.Init = true;
 //            cmdArgs.Update = true;
@@ -44,8 +66,8 @@ namespace watchCode
             //cmdArgs.CompareAndUpdateDocs = true;
 
 
-            config.DirsToIgnore.Add(DynamicConfig.GetAbsoluteWatchCodeDirPath(config.WatchCodeDirName));
-            Logger.Info($"added dir {DynamicConfig.GetAbsoluteWatchCodeDirPath(config.WatchCodeDirName)} to " +
+            config.DirsToIgnore.Add(DynamicConfig.GetAbsoluteWatchCodeDirPath(config));
+            Logger.Info($"added dir {DynamicConfig.GetAbsoluteWatchCodeDirPath(config)} to " +
                         $"ignore list because this is the watch code dir");
 
 
@@ -57,6 +79,9 @@ namespace watchCode
             }
 
 
+            Logger.Info("--- getting all watch expressions ---");
+            Stopwatch.Restart();
+            
             #region --- get all doc files that could contain watch expressions 
 
             //this also checks if files exists... in case we use it without calling validate before
@@ -89,6 +114,9 @@ namespace watchCode
                 Logger.Warn("no watch expressions found");
             }
 
+            Stopwatch.Stop();
+            Logger.Info($"--- end getting all watch expressions (took {StopWatchHelper.GetElapsedTime(Stopwatch)}) ---");
+
             //make sure we don't watch the same (source) lines in the same doc file rang...
             //e.g. if a doc file has 1 watch expression with >= 2 expressions watching the same source file range
 
@@ -111,13 +139,18 @@ namespace watchCode
 
 
             //--- main part
-
+            
+            Logger.Info("--- main part ---");
+            Stopwatch.Restart();
 
             Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap;
 
 
             NoReduceWatchExpressionsRun(allWatchExpressions, cmdArgs, config, out equalMap);
 
+            Stopwatch.Stop();
+            Logger.Info($"--- end main part (took {StopWatchHelper.GetElapsedTime(Stopwatch)}) ---");
+            
             if (cmdArgs.Compare)
             {
                 OutputEqualsResults(equalMap, out var someSnapshotChanged, out var someSnapshotUsedBottomToTopLines,
@@ -176,6 +209,10 @@ namespace watchCode
 
             foreach (var watchExpression in allWatchExpressions)
             {
+                
+                Logger.Info($"evaluating watch expression in doc file: {watchExpression.GetDocumentationLocation()}, " +
+                            $"watching source file: {watchExpression.GetSourceFileLocation()}");
+                
                 EvaulateSingleWatchExpression(watchExpression, cmdArgs, config,
                     snapshotsDictionary, alreadyReadSnapshots, equalMap);
             }
@@ -195,6 +232,8 @@ namespace watchCode
         private static void BulkWriteCapturedSnapshots(Config config,
             Dictionary<string, List<(Snapshot snapshot, WatchExpression watchExpression)>> snapshotsDictionary)
         {
+            Logger.Info($"----- bulk writing snapshots -----");
+            
             //but now we know all watch expressions to combine for every file
 
             //we would write them one after another in the target file... then then wrap them by []
@@ -204,18 +243,19 @@ namespace watchCode
             {
                 //pair.Value.Count > 0 is checked in SaveSnapshots with message
                 bool created =
-                    SnapshotWrapperHelper.SaveSnapshots(pair.Value.Select(p => p.snapshot).ToList(),
-                        config.WatchCodeDirName, config.SnapshotDirName);
+                    SnapshotWrapperHelper.SaveSnapshots(pair.Value.Select(p => p.snapshot).ToList(), config);
 
                 if (pair.Value.Count > 0)
                 {
                     (Snapshot snapshot, WatchExpression watchExpression) firstTuple = pair.Value.First();
                     Logger.Info(
                         $"snapshot for all watch expressions in for doc " +
-                        $"file: {firstTuple.watchExpression.DocumentationFilePath} were created at: " +
-                        $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config.WatchCodeDirName, config.SnapshotDirName), firstTuple.watchExpression, true)}");
+                        $"file: {firstTuple.watchExpression.GetDocumentationLocation()} was created at: " +
+                        $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), firstTuple.watchExpression, true)}");
                 }
             }
+            
+            Logger.Info($"----- end bulk writing snapshots -----");
         }
 
 
@@ -251,8 +291,7 @@ namespace watchCode
                     {
                         sineleSnapshotExists =
                             SnapshotHelper.SnapshotCombinedExists(
-                                DynamicConfig.GetAbsoluteSnapShotDirPath(config.WatchCodeDirName,
-                                    config.SnapshotDirName),
+                                DynamicConfig.GetAbsoluteSnapShotDirPath(config),
                                 watchExpression, out var readSnapshots);
 
                         if (sineleSnapshotExists)
@@ -265,7 +304,7 @@ namespace watchCode
                     {
                         Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
                                     $"already exists at: " +
-                                    $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config.WatchCodeDirName, config.SnapshotDirName), watchExpression, true)}" +
+                                    $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}" +
                                     $", skipping");
                     }
                     else
@@ -294,7 +333,7 @@ namespace watchCode
                         }
                         Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
                                     $"was added at: " +
-                                    $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config.WatchCodeDirName, config.SnapshotDirName), watchExpression, true)}");
+                                    $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}");
                     }
 
                     return;
@@ -304,7 +343,7 @@ namespace watchCode
                 //do not touch old snapshots
                 bool snapshotExists =
                     SnapshotHelper.SnapshotExists(
-                        DynamicConfig.GetAbsoluteSnapShotDirPath(config.WatchCodeDirName, config.SnapshotDirName),
+                        DynamicConfig.GetAbsoluteSnapShotDirPath(config),
                         watchExpression);
 
                 if (snapshotExists)
@@ -313,7 +352,7 @@ namespace watchCode
 
                     Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
                                 $"already exists at: " +
-                                $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config.WatchCodeDirName, config.SnapshotDirName), watchExpression, true)}" +
+                                $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}" +
                                 $", skipping");
 
                     return;
@@ -321,12 +360,11 @@ namespace watchCode
 
                 //create and save new snapshot
                 // ReSharper disable once PossibleInvalidOperationException
-                SnapshotWrapperHelper.CreateAndSaveSnapshot(watchExpression, config.WatchCodeDirName,
-                    config.SnapshotDirName);
+                SnapshotWrapperHelper.CreateAndSaveSnapshot(watchExpression, config);
 
                 Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
                             $"was created at: " +
-                            $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config.WatchCodeDirName, config.SnapshotDirName), watchExpression, true)}");
+                            $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}");
 
                 #endregion
             }
@@ -368,19 +406,18 @@ namespace watchCode
 
                     Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
                                 $"was added at: " +
-                                $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config.WatchCodeDirName, config.SnapshotDirName), watchExpression, true)}");
+                                $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}");
 
                     return;
                 }
 
                 //create and save new snapshot
                 // ReSharper disable once PossibleInvalidOperationException
-                SnapshotWrapperHelper.CreateAndSaveSnapshot(watchExpression, config.WatchCodeDirName,
-                    config.SnapshotDirName);
+                SnapshotWrapperHelper.CreateAndSaveSnapshot(watchExpression, config);
 
                 Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
                             $"was saved at: " +
-                            $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config.WatchCodeDirName, config.SnapshotDirName), watchExpression, true)}");
+                            $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}");
 
                 #endregion
             }
@@ -391,7 +428,7 @@ namespace watchCode
 
                 // ReSharper disable once PossibleInvalidOperationException
                 string oldSnapshotPath = SnapshotHelper.GetAbsoluteSnapshotFilePath(
-                    DynamicConfig.GetAbsoluteSnapShotDirPath(config.WatchCodeDirName, config.SnapshotDirName),
+                    DynamicConfig.GetAbsoluteSnapShotDirPath(config),
                     watchExpression, config.CombineSnapshotFiles.Value);
 
                 Snapshot oldSnapshot;

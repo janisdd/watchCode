@@ -207,7 +207,7 @@ namespace watchCode.helpers
             string newWatchExpressionLine = builder.ToString();
 
             var absoluteTempFilePath =
-                Path.Combine(DynamicConfig.GetAbsoluteWatchCodeDirPath(config.WatchCodeDirName), fileInfo.Name);
+                Path.Combine(DynamicConfig.GetAbsoluteWatchCodeDirPath(config), fileInfo.Name);
 
             try
             {

@@ -23,7 +23,7 @@ namespace watchCode.helpers
         /// the log will be printed to stdout if specified
         /// however errors will always be printed to stderr
         /// </summary>
-        public static LogLevel LogLevel = LogLevel.Info;
+        public static LogLevel LogLevel;
 
         /// <summary>
         /// overwrites the last one if we have too much entries,
@@ -35,6 +35,11 @@ namespace watchCode.helpers
 
         public static string LogFileName = "log.txt";
 
+
+        static Logger()
+        {
+            LogLevel = LogLevel.Info;
+        }
 
         /// <summary>
         /// logs an info (for verbose mode)
@@ -139,7 +144,7 @@ namespace watchCode.helpers
 
         public static void WriteLog(Config config)
         {
-            string absoluteFilePath = Path.Combine(DynamicConfig.GetAbsoluteWatchCodeDirPath(config.WatchCodeDirName),
+            string absoluteFilePath = Path.Combine(DynamicConfig.GetAbsoluteWatchCodeDirPath(config),
                 LogFileName);
 
             try

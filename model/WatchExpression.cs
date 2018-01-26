@@ -2,7 +2,15 @@
 {
     public struct WatchExpression : ISnapshotLike
     {
+        /// <summary>
+        /// the source file path
+        /// </summary>
         public string WatchExpressionFilePath { get; set; }
+        
+        /// <summary>
+        /// the line range to watch
+        /// or null to watch the whole file (for any changes)
+        /// </summary>
         public LineRange LineRange { get; set; }
 
         /// <summary>
@@ -98,6 +106,11 @@
         public string GetDocumentationLocation()
         {
             return DocumentationFilePath + ", " + DocumentationLineRange.Start + "-" + DocumentationLineRange.End;
+        }
+        
+        public string GetSourceFileLocation()
+        {
+            return ToString();
         }
     }
 }

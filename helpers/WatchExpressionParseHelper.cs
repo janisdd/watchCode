@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -15,6 +16,10 @@ namespace watchCode.helpers
             Dictionary<string, List<(string start, string end)>> knownFileExtensionsWithoutExtension,
             List<string> initWatchExpressionKeywords)
         {
+            
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+            
             List<WatchExpression> watchExpressions = new List<WatchExpression>();
 
             string fileContent = File.ReadAllText(docFileInfo.FullName);
@@ -42,7 +47,7 @@ namespace watchCode.helpers
                     if (expressionLocation == null)
                     {
                         Logger.Warn(
-                            $"could not get watch expression num: {i + 1} location in doc file: {docFileInfo.FullName}, skipping");
+                            $"could not get watch expression num: {i + 1}. expression in doc file: {docFileInfo.FullName}, skipping");
                         continue;
                     }
 
@@ -65,7 +70,11 @@ namespace watchCode.helpers
                 }
             }
 
-
+            stopwatch.Stop();
+            
+            Logger.Info($"parsed file {docFileInfo.FullName} (contained {watchExpressions.Count} expression(s)) " +
+                        $"in {StopWatchHelper.GetElapsedTime(stopwatch)}");
+            
             return watchExpressions;
         }
 

@@ -35,7 +35,7 @@ namespace watchCode.helpers
                 return false;
             }
 
-            Logger.Info($"dumped {watchExpressions.Count} watch expressions into file: {absoluteDumpFilePath}");
+            Logger.Info($"dumped {watchExpressions.Count} watch expression(s) into file: {absoluteDumpFilePath}");
 
             return true;
         }

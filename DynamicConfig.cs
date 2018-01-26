@@ -27,14 +27,14 @@ namespace watchCode
             };
         }
 
-        public static string GetAbsoluteWatchCodeDirPath(string watchCodeDirName)
+        public static string GetAbsoluteWatchCodeDirPath(Config config)
         {
-            return Path.Combine(AbsoluteRootDirPath, watchCodeDirName);
+            return Path.Combine(AbsoluteRootDirPath, config.WatchCodeDirName);
         }
 
-        public static string GetAbsoluteSnapShotDirPath(string watchCodeDirName, string snapshotDirName)
+        public static string GetAbsoluteSnapShotDirPath(Config config)
         {
-            return Path.Combine(GetAbsoluteWatchCodeDirPath(watchCodeDirName), snapshotDirName);
+            return Path.Combine(GetAbsoluteWatchCodeDirPath(config), config.SnapshotDirName);
         }
 
         public static string GetAbsoluteFilePath(string watchExpressionFilePath)

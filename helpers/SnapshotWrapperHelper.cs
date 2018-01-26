@@ -75,19 +75,18 @@ namespace watchCode.helpers
 
         //--- for single snapshots / no combine snapshots
 
-        public static bool SaveSnapshot(Snapshot snapshot, string watchCodeDirName, string snapshotDirName)
+        public static bool SaveSnapshot(Snapshot snapshot, Config config)
         {
             //save new snapshot
-            string snapshotDirPath = DynamicConfig.GetAbsoluteSnapShotDirPath(watchCodeDirName, snapshotDirName);
+            string snapshotDirPath = DynamicConfig.GetAbsoluteSnapShotDirPath(config);
             return SnapshotHelper.SaveSnapshot(snapshotDirPath, snapshot, prettyPrintSnapshots);
         }
 
-        public static bool CreateAndSaveSnapshot(WatchExpression watchExpression, string watchCodeDirName,
-            string snapshotDirName)
+        public static bool CreateAndSaveSnapshot(WatchExpression watchExpression, Config config)
         {
             var snapShot = CreateSnapshot(watchExpression);
 
-            return SaveSnapshot(snapShot, watchCodeDirName, snapshotDirName);
+            return SaveSnapshot(snapShot, config);
         }
 
 
@@ -102,9 +101,9 @@ namespace watchCode.helpers
         }
 
 
-        public static bool SaveSnapshots(List<Snapshot> snapshots, string watchCodeDirName, string snapshotDirName)
+        public static bool SaveSnapshots(List<Snapshot> snapshots, Config config)
         {
-            string snapshotDirPath = DynamicConfig.GetAbsoluteSnapShotDirPath(watchCodeDirName, snapshotDirName);
+            string snapshotDirPath = DynamicConfig.GetAbsoluteSnapShotDirPath(config);
             return SnapshotHelper.SaveSnapshots(snapshotDirPath, snapshots, prettyPrintSnapshots);
         }
     }
