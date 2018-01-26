@@ -75,18 +75,18 @@ namespace watchCode.helpers
 
         //--- for single snapshots / no combine snapshots
 
-        public static bool SaveSnapshot(Snapshot snapshot, Config config)
+        public static bool SaveSnapshot(Snapshot snapshot, WatchExpression watchExpression, Config config)
         {
             //save new snapshot
             string snapshotDirPath = DynamicConfig.GetAbsoluteSnapShotDirPath(config);
-            return SnapshotHelper.SaveSnapshot(snapshotDirPath, snapshot, prettyPrintSnapshots);
+            return SnapshotHelper.SaveSnapshot(snapshotDirPath, snapshot, watchExpression, prettyPrintSnapshots);
         }
 
         public static bool CreateAndSaveSnapshot(WatchExpression watchExpression, Config config)
         {
             var snapShot = CreateSnapshot(watchExpression);
 
-            return SaveSnapshot(snapShot, config);
+            return SaveSnapshot(snapShot, watchExpression, config);
         }
 
 

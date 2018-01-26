@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -88,12 +89,11 @@ namespace watchCode.helpers
             return snapshot;
         }
 
+        //TODO rework logg output
         /// <summary>
         /// </summary>
         /// <param name="absoluteFilePath"></param>
         /// <param name="watchExpression"></param>
-        /// <param name="storePlainLines">true: store the watched plain lines in the snapshot 
-        /// (useful when we search through the file and try to find the old lines), else: not</param>
         /// <returns></returns>
         public static Snapshot CreateSnapshot(string absoluteFilePath, WatchExpression watchExpression)
         {
@@ -198,6 +198,8 @@ namespace watchCode.helpers
         public static Snapshot CreateSnapshotBasedOnOldSnapshot(string absoluteFilePath,
             WatchExpression watchExpression, Snapshot oldSnapshot, out bool snapshotsWereEqual)
         {
+            var stopwatch = new Stopwatch();
+
             FileInfo fileInfo;
             snapshotsWereEqual = false;
 
@@ -263,6 +265,9 @@ namespace watchCode.helpers
 
             #endregion
 
+
+            stopwatch.Start();
+
             //file exists
 
             string line;
@@ -303,6 +308,13 @@ namespace watchCode.helpers
                 if (areEqual)
                 {
                     snapshotsWereEqual = true;
+
+                    stopwatch.Stop();
+                    Logger.Info($"snapshot created from old one (found lines, used top offset) for doc " +
+                                $"file: {watchExpression.GetDocumentationLocation()}, " +
+                                $"source file: {watchExpression.GetSourceFileLocation()} " +
+                                $"(in {StopWatchHelper.GetElapsedTime(stopwatch)})");
+
                     return newSnapshot;
                 }
 
@@ -310,11 +322,6 @@ namespace watchCode.helpers
                 #region --- check bottom to top (reverse line range)
 
                 //maybe the user only inserted lines above... check from bottom
-
-                Logger.Info($"created snapshot from old snapshot (from start) and was not equal, " +
-                            $"snapshot: {watchExpression.WatchExpressionFilePath}, " +
-                            $"doc file: {watchExpression.GetDocumentationLocation()}, " +
-                            $"using file bottom offset...");
 
                 //empty list but keep count
                 //if we have few lines now and we don't get the full range (user deleted lines
@@ -354,12 +361,13 @@ namespace watchCode.helpers
 
                 if (areEqualFromBottom)
                 {
-                    Logger.Info($"...bottom offset worked");
+                    Logger.Info($"snapshot created from old one (found lines, used bottom offset) for doc " +
+                                $"file: {watchExpression.GetDocumentationLocation()}, " +
+                                $"source file: {watchExpression.GetSourceFileLocation()} " +
+                                $"(in {StopWatchHelper.GetElapsedTime(stopwatch)})");
                     snapshotsWereEqual = true;
                     return newSnapshot;
                 }
-                
-                Logger.Info($"...bottom offset didn't work");
 
                 #region --- search through the whole file and try find the lines
 
@@ -367,11 +375,6 @@ namespace watchCode.helpers
                 //try to find the old lines (from the old snapshot) in the file
                 int equalLine = 0;
                 int newStartLine = 0;
-                
-                Logger.Info($"created snapshot from old snapshot (from start & end) and was not equal, " +
-                            $"snapshot: {watchExpression.WatchExpressionFilePath}, " +
-                            $"doc file: {watchExpression.GetDocumentationLocation()}, " +
-                            $"searching through file to find lines...");
 
                 lines.Clear();
 
@@ -416,9 +419,13 @@ namespace watchCode.helpers
                         oldSnapshot.ReversedLineRange, linesCount,
                         oldSnapshot.Lines.ToList() //lines are equal
                     );
-                    snapshotsWereEqual = true;
+
+                    Logger.Info($"snapshot created from old one (found lines, used search) for doc " +
+                                $"file: {watchExpression.GetDocumentationLocation()}, " +
+                                $"source file: {watchExpression.GetSourceFileLocation()} " +
+                                $"(in {StopWatchHelper.GetElapsedTime(stopwatch)})");
                     
-                    Logger.Info($"...found lines somehwere in the file");
+                    snapshotsWereEqual = true;
                 }
                 else
                 {
@@ -428,9 +435,15 @@ namespace watchCode.helpers
                         lines
                     );
                     
-                    Logger.Info($"...could not find lines in the file");
+                    Logger.Info($"snapshot created from old one (lines were not found) for doc " +
+                                $"file: {watchExpression.GetDocumentationLocation()}, " +
+                                $"source file: {watchExpression.GetSourceFileLocation()} " +
+                                $"(in {StopWatchHelper.GetElapsedTime(stopwatch)})");
+                    
+                    snapshotsWereEqual = false;
                 }
-                snapshotsWereEqual = false;
+
+                //newSnapshot.TriedBottomOffset is false because we created a new snapshot this is what we want
                 newSnapshot.TriedSearchFileOffset = true;
 
                 #endregion
@@ -438,8 +451,8 @@ namespace watchCode.helpers
             catch (Exception e)
             {
                 Logger.Error(
-                    $"could not create snapshot for file: {absoluteFilePath}, error (during read): {e.Message}, " +
-                    $"at doc file: {watchExpression.GetDocumentationLocation()}");
+                    $"could not create snapshot for doc file: {watchExpression.GetDocumentationLocation()}, " +
+                    $"source file: {watchExpression.GetSourceFileLocation()},error (during read): {e.Message}");
                 return null;
             }
 
@@ -461,7 +474,7 @@ namespace watchCode.helpers
         //--- for single snapshots / no combine snapshots
 
         public static bool SaveSnapshot(string absoluteSnapshotDirectoryPath, Snapshot snapshot,
-            bool prettyPrint = false)
+            WatchExpression watchExpression, bool prettyPrint = false)
         {
             try
             {
@@ -475,7 +488,9 @@ namespace watchCode.helpers
             catch (Exception e)
             {
                 Logger.Error(
-                    $"could not opne/create snapshot dir: {absoluteSnapshotDirectoryPath}, error: {e.Message}");
+                    $"could not opne/create snapshot dir: {absoluteSnapshotDirectoryPath}, " +
+                    $"doc file: {watchExpression.GetDocumentationLocation()}, " +
+                    $"source file: {watchExpression.GetSourceFileLocation()}, error: {e.Message}");
                 return false;
             }
 
@@ -492,7 +507,9 @@ namespace watchCode.helpers
             catch (Exception e)
             {
                 Logger.Error(
-                    $"could not serialize or write snapshot to file: {filePath}, snapshot from: {snapshot}, error: {e.Message}");
+                    $"could not serialize or write snapshot to file: {filePath}, " +
+                    $"doc file: {watchExpression.GetDocumentationLocation()}, " +
+                    $"source file: {watchExpression.GetSourceFileLocation()}, error: {e.Message}");
                 return false;
             }
 

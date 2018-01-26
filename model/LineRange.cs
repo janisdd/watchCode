@@ -26,9 +26,19 @@ namespace watchCode.model
 
         public static bool operator ==(LineRange lr1, LineRange lr2)
         {
-            if ((object)lr1 == null && (object)lr2 == null) return true;
+            if (ReferenceEquals(lr1, lr2))
+            {
+                return true;
+            }
 
-            if ((object)lr1 == null || (object)lr2 == null) return false;
+            if (ReferenceEquals(lr1, null))
+            {
+                return false;
+            }
+            if (ReferenceEquals(lr2, null))
+            {
+                return false;
+            }
             
             return lr1.Start == lr2.Start && lr1.End == lr2.End;
         }

@@ -3,9 +3,10 @@
  */
 
 
+
 //from https://stackoverflow.com/questions/40200089/is-a-number-prime
 function isPrime(num: number): boolean {
     for (let i = 2, s = Math.sqrt(num); i <= s; i++)
-        if (num % i === 0) return false;xxx
+        if (num % i === 0) return false;123
     return num !== 1;
 }

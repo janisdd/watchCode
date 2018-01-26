@@ -9,25 +9,31 @@ namespace watchCode.helpers
 {
     public static class DocsHelper
     {
+
         /// <summary>
-        /// 
         /// <remarks>
         /// note that writing to a file (updating a doc file) will insert new line characters based on the os!
         /// </remarks>
-        /// 
         /// </summary>
         /// <param name="watchExpressions">all watch expressions in the same doc file (and position in this file) 
         /// with the same watch expression</param>
         /// <param name="knownFileExtensionsWithoutExtension"></param>
         /// <param name="initWatchExpressionKeywords"></param>
         /// <param name="config"></param>
+        /// <param name="updateWatchExpressionsList">list with the (and only) the update watch expressions</param>
         /// <returns></returns>
         public static bool UpdateWatchExpressionInDocFile(
             List<(WatchExpression watchExpression, bool wasEqual, Snapshot snapshot)> watchExpressions,
             Dictionary<string, List<(string start, string end)>> knownFileExtensionsWithoutExtension,
             List<string> initWatchExpressionKeywords,
-            Config config)
+            Config config,
+            out List<(WatchExpression oldWatchExpression, WatchExpression updateWatchExpression)>
+                updateWatchExpressionsList)
         {
+            updateWatchExpressionsList =
+                new List<(WatchExpression oldWatchExpression, WatchExpression updateWatchExpression)>();
+            
+            //stores the lines of the doc file 
             var linesBuilder = new StringBuilder();
 
             if (watchExpressions.Count == 0) return true;
@@ -175,29 +181,49 @@ namespace watchCode.helpers
                         builder.Append(tuple.watchExpression.WatchExpressionFilePath);
                         builder.Append(" ");
 
-                        // ReSharper disable once PossibleInvalidOperationException
-                        builder.Append(
-                            tuple.wasEqual &&
-                            (tuple.snapshot.TriedBottomOffset ||
-                             tuple.snapshot.TriedSearchFileOffset) //if not take old range
-                                ? GetNewLineRange(tuple.watchExpression, tuple.snapshot).ToShortString()
-                                : tuple.watchExpression.LineRange.ToShortString()
-                        );
+
+                        if (tuple.wasEqual &&
+                            (tuple.snapshot.TriedBottomOffset || tuple.snapshot.TriedSearchFileOffset))
+                        {
+                            var newLineRange = GetNewLineRange(tuple.watchExpression, tuple.snapshot);
+                            builder.Append(newLineRange.ToShortString());
+
+                            updateWatchExpressionsList.Add(
+                                (tuple.watchExpression,
+                                new WatchExpression(
+                                    tuple.watchExpression.WatchExpressionFilePath, newLineRange,
+                                    tuple.watchExpression.DocumentationFilePath,
+                                    tuple.watchExpression.DocumentationLineRange)
+                                ));
+                        }
+                        else
+                        {
+                            builder.Append(tuple.watchExpression.LineRange.ToShortString());
+                        }
 
                         continue;
                     }
 
-                    var lineRange = GetNewLineRange(tuple.watchExpression, tuple.snapshot);
                     builder.Append(", ");
 
-                    // ReSharper disable once PossibleInvalidOperationException
-                    builder.Append(
-                        tuple.wasEqual &&
-                        (tuple.snapshot.TriedBottomOffset ||
-                         tuple.snapshot.TriedSearchFileOffset) //if not take old range
-                            ? GetNewLineRange(tuple.watchExpression, tuple.snapshot).ToShortString()
-                            : tuple.watchExpression.LineRange.ToShortString()
-                    );
+                    if (tuple.wasEqual &&
+                        (tuple.snapshot.TriedBottomOffset || tuple.snapshot.TriedSearchFileOffset))
+                    {
+                        var newLineRange = GetNewLineRange(tuple.watchExpression, tuple.snapshot);
+                        builder.Append(newLineRange.ToShortString());
+
+                        updateWatchExpressionsList.Add(
+                            (tuple.watchExpression,
+                            new WatchExpression(
+                                tuple.watchExpression.WatchExpressionFilePath, newLineRange,
+                                tuple.watchExpression.DocumentationFilePath,
+                                tuple.watchExpression.DocumentationLineRange)
+                            ));
+                    }
+                    else
+                    {
+                        builder.Append(tuple.watchExpression.LineRange.ToShortString());
+                    }
                 }
             }
 

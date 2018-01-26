@@ -14,35 +14,48 @@ namespace watchCode
         public const int NotEqualCompareReturnCode = 1;
         public const int NeedToUpdateDocRanges = 2;
         public const int ErrorReturnCode = 100;
-        
+
         public static Stopwatch Stopwatch = new Stopwatch();
         public static Stopwatch TotalStopwatch = new Stopwatch();
+
+        public static ConsoleColor OkResultBgColor = ConsoleColor.DarkGreen;
+        public static ConsoleColor WarningResultBgColor = ConsoleColor.DarkYellow;
+        public static ConsoleColor ChangedResultBgColor = ConsoleColor.DarkRed;
+
+        public static string OkResultString = " PASS ";
+        public static string WarningResultString = " WARN ";
+        public static string ChangedResultString = " FAIL ";
+
+        //TODO after updating docs --> old snapshots are invalid (wrong line rang)
+        //--> after updating docs update old snapshots (re crete) only for those expressions
+        //where we automatically updated
+        //use bulk update ...
 
         static int Main(string[] args)
         {
             TotalStopwatch.Start();
-            Logger.OutputLogToConsole = true;
-            
-            Logger.Info($"--- bootstrapping ---");
+
             Stopwatch.Start();
-            
+            Logger.Info($"--- bootstrapping ---");
+
+
             DynamicConfig.AbsoluteRootDirPath = Directory.GetCurrentDirectory();
 
             var (cmdArgs, config) = CmdArgsHelper.ParseArgs(args);
 
             //some checking 
             BootstrapHelper.Bootstrap(cmdArgs, config);
-            
+
             Stopwatch.Stop();
             Logger.Info($"--- end bootstrapping (took {StopWatchHelper.GetElapsedTime(Stopwatch)}) ---");
 
             int returnCode = Run(cmdArgs, config);
-            
+
             TotalStopwatch.Stop();
-            
+
             //Logger.Info("---");
             Logger.Info($"total time: {StopWatchHelper.GetElapsedTime(TotalStopwatch)}");
-            
+
             return returnCode;
         }
 
@@ -50,9 +63,9 @@ namespace watchCode
         public static int Run(CmdArgs cmdArgs, Config config)
         {
             int returnCode = OkReturnCode;
-            
-            
-            
+
+//            Logger.OutputLogToConsole = true;
+
 
             //cmdArgs.Init = true;
 //            cmdArgs.Update = true;
@@ -61,9 +74,8 @@ namespace watchCode
             //after updating docs all bottom to top snapshots are invalid (ranges)
             //after the docs update we don't know which snapshot belongs to which doc watch expression...
 
-           
 
-            //cmdArgs.CompareAndUpdateDocs = true;
+//            cmdArgs.CompareAndUpdateDocs = true;
 
 
             config.DirsToIgnore.Add(DynamicConfig.GetAbsoluteWatchCodeDirPath(config));
@@ -79,9 +91,10 @@ namespace watchCode
             }
 
 
-            Logger.Info("--- getting all watch expressions ---");
             Stopwatch.Restart();
-            
+            Logger.Info("--- getting all watch expressions ---");
+
+
             #region --- get all doc files that could contain watch expressions 
 
             //this also checks if files exists... in case we use it without calling validate before
@@ -115,7 +128,8 @@ namespace watchCode
             }
 
             Stopwatch.Stop();
-            Logger.Info($"--- end getting all watch expressions (took {StopWatchHelper.GetElapsedTime(Stopwatch)}) ---");
+            Logger.Info(
+                $"--- end getting all watch expressions (took {StopWatchHelper.GetElapsedTime(Stopwatch)}) ---");
 
             //make sure we don't watch the same (source) lines in the same doc file rang...
             //e.g. if a doc file has 1 watch expression with >= 2 expressions watching the same source file range
@@ -137,11 +151,10 @@ namespace watchCode
 
             #endregion
 
+            #region --- main part
 
-            //--- main part
-            
-            Logger.Info("--- main part ---");
             Stopwatch.Restart();
+            Logger.Info("--- main part ---");
 
             Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap;
 
@@ -150,30 +163,20 @@ namespace watchCode
 
             Stopwatch.Stop();
             Logger.Info($"--- end main part (took {StopWatchHelper.GetElapsedTime(Stopwatch)}) ---");
-            
+
+            #endregion
+
             if (cmdArgs.Compare)
             {
-                OutputEqualsResults(equalMap, out var someSnapshotChanged, out var someSnapshotUsedBottomToTopLines,
-                    false);
+                OutputEqualsResults(equalMap, out var someSnapshotChanged,
+                    out var someSnapshotUsedBottomToTopOrSearchLines, false);
 
-                if (someSnapshotUsedBottomToTopLines)
-                {
-                    Console.WriteLine("seems that you need to update the line range because" +
-                                      "some lines in some files were inserted...");
-                    Console.WriteLine("you can run the command compare and update docs to automatically update" +
-                                      "the line ranges...");
+                if (someSnapshotUsedBottomToTopOrSearchLines) returnCode = NeedToUpdateDocRanges;
 
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("...this will rewrite the watch expression comments and delete every text " +
-                                      "before and after the watch expression inside the corresponding comment");
-                    Console.ResetColor();
 
-                    returnCode = NeedToUpdateDocRanges;
-                }
-                else if (someSnapshotChanged)
-                {
-                    returnCode = NotEqualCompareReturnCode;
-                }
+                //overwrite NeedToUpdateDocRanges because not equal is more important
+                if (someSnapshotChanged) returnCode = NotEqualCompareReturnCode;
+
 
                 if (cmdArgs.CompareAndUpdateDocs)
                 {
@@ -182,7 +185,6 @@ namespace watchCode
             }
 
             if (cmdArgs.WriteLog) Logger.WriteLog(config);
-
 
             return returnCode;
         }
@@ -209,10 +211,9 @@ namespace watchCode
 
             foreach (var watchExpression in allWatchExpressions)
             {
-                
                 Logger.Info($"evaluating watch expression in doc file: {watchExpression.GetDocumentationLocation()}, " +
                             $"watching source file: {watchExpression.GetSourceFileLocation()}");
-                
+
                 EvaulateSingleWatchExpression(watchExpression, cmdArgs, config,
                     snapshotsDictionary, alreadyReadSnapshots, equalMap);
             }
@@ -233,7 +234,7 @@ namespace watchCode
             Dictionary<string, List<(Snapshot snapshot, WatchExpression watchExpression)>> snapshotsDictionary)
         {
             Logger.Info($"----- bulk writing snapshots -----");
-            
+
             //but now we know all watch expressions to combine for every file
 
             //we would write them one after another in the target file... then then wrap them by []
@@ -254,7 +255,7 @@ namespace watchCode
                         $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), firstTuple.watchExpression, true)}");
                 }
             }
-            
+
             Logger.Info($"----- end bulk writing snapshots -----");
         }
 
@@ -274,33 +275,33 @@ namespace watchCode
                 if (config.CombineSnapshotFiles.Value)
                 {
                     //because we store combined snapshots we read all snapshots in the file
-                    //actually we would only need until we found the right snapshot but we assume
-                    //that we almost need to read all snapshots from the file anyway
+                    //actually we would only need to read until we found the right snapshot but we assume
+                    //that we almost every time need to read all snapshots from the file anyway
 
                     //so store the already read snapshots
 
-                    bool sineleSnapshotExists = false;
+                    bool singleSnapshotExists = false;
 
                     if (alreadyReadSnapshots.TryGetValue(watchExpression.WatchExpressionFilePath,
                         out var alreayReadSnapshots))
                     {
                         if (alreayReadSnapshots.Any(p => p.LineRange == watchExpression.LineRange))
-                            sineleSnapshotExists = true;
+                            singleSnapshotExists = true;
                     }
                     else
                     {
-                        sineleSnapshotExists =
+                        singleSnapshotExists =
                             SnapshotHelper.SnapshotCombinedExists(
                                 DynamicConfig.GetAbsoluteSnapShotDirPath(config),
                                 watchExpression, out var readSnapshots);
 
-                        if (sineleSnapshotExists)
+                        if (singleSnapshotExists)
                         {
                             alreadyReadSnapshots.Add(watchExpression.WatchExpressionFilePath, readSnapshots);
                         }
                     }
 
-                    if (sineleSnapshotExists)
+                    if (singleSnapshotExists)
                     {
                         Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
                                     $"already exists at: " +
@@ -332,7 +333,7 @@ namespace watchCode
                                 });
                         }
                         Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
-                                    $"was added at: " +
+                                    $"was added to bulk save: " +
                                     $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}");
                     }
 
@@ -519,6 +520,10 @@ namespace watchCode
             Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap,
             out bool someSnapshotChanged, out bool someSnapshotUsedBottomToTopOrSearchLines, bool suppressOutput)
         {
+            Stopwatch.Restart();
+            Logger.Info("--- compare results ---");
+            Console.WriteLine($"{new string('-', OkResultString.Length)} compare results");
+
             WatchExpression watchExpression;
 
             someSnapshotChanged = false;
@@ -529,88 +534,101 @@ namespace watchCode
                 var tuple = pair.Value;
                 watchExpression = pair.Key;
 
-                string range = watchExpression.LineRange == null
-                    ? "somewhere"
-                    : watchExpression.LineRange.ToString();
-
                 if (tuple.wasEqual)
                 {
                     if (tuple.newSnapshot.TriedBottomOffset)
                     {
+                        //user inserted lines before the watched lines
                         someSnapshotUsedBottomToTopOrSearchLines = true;
 
                         Logger.Info(
-                            $"snapshots are equal! file name: {watchExpression.WatchExpressionFilePath}, range from bottom: {tuple.newSnapshot.ReversedLineRange}");
+                            $"{watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} needs to be updated (used bottom offset)");
 
                         if (suppressOutput == false)
                         {
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.Write(watchExpression.WatchExpressionFilePath);
+                            Console.BackgroundColor = WarningResultBgColor;
+                            Console.Write(WarningResultString);
                             Console.ResetColor();
-                            Console.Write(" lines inserted before, update line range --> ");
-                            Console.ForegroundColor = ConsoleColor.DarkGreen;
-                            Console.Write(watchExpression.GetDocumentationLocation());
-                            Console.WriteLine();
-                            Console.ResetColor();
+                            Console.WriteLine(
+                                $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} needs to be updated [used bottom offset]");
                         }
                     }
                     else if (tuple.newSnapshot.TriedSearchFileOffset)
                     {
                         someSnapshotUsedBottomToTopOrSearchLines = true;
 
+                        //user inserted lines before and after the watched lines --> line range is totaly wrong now
                         Logger.Info(
-                            $"snapshots are equal! file name: {watchExpression.WatchExpressionFilePath}, found new range (via searching): {tuple.newSnapshot.ReversedLineRange}");
+                            $"{watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} needs to be updated (used search)");
 
                         if (suppressOutput == false)
                         {
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.Write(watchExpression.WatchExpressionFilePath);
+                            Console.BackgroundColor = WarningResultBgColor;
+                            Console.Write(WarningResultString);
                             Console.ResetColor();
-                            Console.Write(" lines inserted before & after, update line range --> ");
-                            Console.ForegroundColor = ConsoleColor.DarkGreen;
-                            Console.Write(watchExpression.GetDocumentationLocation());
-                            Console.WriteLine();
-                            Console.ResetColor();
+                            Console.WriteLine(
+                                $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} needs to be updated [used search]");
                         }
                     }
                     else
                     {
                         Logger.Info(
-                            $"snapshots are equal! file name: {watchExpression.WatchExpressionFilePath}, range: {range}");
+                            $"{watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()}");
+
+                        Console.BackgroundColor = OkResultBgColor;
+                        Console.Write(OkResultString);
+                        Console.ResetColor();
+                        Console.WriteLine(
+                            $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()}");
                     }
                 }
                 else
                 {
-                    Logger.Info($"file: {watchExpression.WatchExpressionFilePath} has changed in range: {range}!");
+                    //could not locate lines... --> something changed in the source file
 
                     someSnapshotChanged = true;
 
                     if (suppressOutput == false)
                     {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.Write(watchExpression.WatchExpressionFilePath);
-
+                        Console.BackgroundColor = ChangedResultBgColor;
+                        Console.Write(ChangedResultString);
                         Console.ResetColor();
-                        Console.Write(" changed, update --> ");
 
-                        Console.ForegroundColor = ConsoleColor.DarkGreen;
-                        Console.Write(watchExpression.GetDocumentationLocation());
-                        Console.WriteLine();
-                        Console.ResetColor();
+                        string path = DynamicConfig.GetAbsoluteFilePath(watchExpression.WatchExpressionFilePath);
+                        var sourceFileExists = File.Exists(path);
+
+                        if (sourceFileExists)
+                        {
+                            Console.WriteLine(
+                                $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} [changed]");
+                        }
+                        else
+                        {
+                            Console.WriteLine(
+                                $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} [deleted/renamed or no permission to access]");
+                        }
                     }
                 }
             }
 
-
-            if (someSnapshotChanged == false && someSnapshotUsedBottomToTopOrSearchLines == false)
+            if (suppressOutput == false)
             {
-                if (suppressOutput == false)
+                if (someSnapshotChanged == false && someSnapshotUsedBottomToTopOrSearchLines == false)
                 {
-                    Console.ForegroundColor = ConsoleColor.DarkGreen;
-                    Console.WriteLine("docs are ok");
+                    Console.ForegroundColor = OkResultBgColor;
+                    Console.WriteLine("all doc files are ok!");
+                    Console.ResetColor();
+                }
+                else
+                {
+                    Console.ForegroundColor = ChangedResultBgColor;
+                    Console.WriteLine("some doc files need to be updated!");
                     Console.ResetColor();
                 }
             }
+
+            Stopwatch.Stop();
+            Logger.Info($"--- end compare results (took {StopWatchHelper.GetElapsedTime(Stopwatch)}) ---");
         }
 
 
@@ -618,7 +636,14 @@ namespace watchCode
             Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap,
             Config config)
         {
-            //if not equal we cannot recover via searching from bottom (because file changed)
+            Stopwatch.Restart();
+            Logger.Info("--- updating docs ---");
+            Console.WriteLine($"{new string('-', OkResultString.Length)} update doc files");
+
+            //if not equal we may recover via searching or bottom offset
+            //but if we have >= 2 watch expressions inside 1 comment we need to rewrite the comment
+            //and update only e.g. 1 epxression so get all expressions in this comment (group by doc location)
+
             var groupedWatchExpressions = equalMap
                     .GroupBy(p => p.Key.GetDocumentationLocation())
                     .ToList()
@@ -626,20 +651,61 @@ namespace watchCode
 
             foreach (var group in groupedWatchExpressions)
             {
+                //tuple contains all expressions in the watch expression comment
                 var tuples = group.ToList();
 
+                //if at least one expression in the watch expression comment has changed we need to updat the comment
+
                 //we need equal --> else we need manual update
-                //if we used bottom or search the doc file must be updated (the line range)
-                if (tuples.Any(p =>
-                    p.Value.wasEqual &&
-                    (p.Value.newSnapshot.TriedBottomOffset || p.Value.newSnapshot.TriedSearchFileOffset) ==
-                    false))
+
+                // equal && TriedBottomOffset == false && TriedSearchFileOffset == false --> nothing changed
+                // equal && TriedBottomOffset == true && TriedSearchFileOffset == false --> update range from 
+                //     bottom offset
+                // equal && TriedBottomOffset == false && TriedSearchFileOffset == true --> update range from search
+
+                //so we can skip if nothing changed or we cannot update automatically  
+                //so we can skip if...
+                if (tuples.All(p =>
+                    (p.Value.wasEqual && p.Value.newSnapshot.TriedBottomOffset == false &&
+                     p.Value.newSnapshot.TriedSearchFileOffset == false) //...nothing changed
+                    ||
+                    p.Value.wasEqual == false)) //...we cannot update automatically  
                 {
+                    foreach (var tuple in tuples)
+                    {
+                        if (tuple.Value.wasEqual)
+                        {
+                            Console.BackgroundColor = OkResultBgColor;
+                            Console.Write(OkResultString);
+                            Console.ResetColor();
+
+                            var message =
+                                $" {tuple.Key.GetDocumentationLocation()} -> {tuple.Key.GetSourceFileLocation()} [not changed]";
+                            Console.WriteLine(message);
+
+                            Logger.Info(message);
+                        }
+                        else
+                        {
+                            Console.BackgroundColor = ChangedResultBgColor;
+                            Console.Write(ChangedResultString);
+                            Console.ResetColor();
+                            var message =
+                                $" {tuple.Key.GetDocumentationLocation()} -> {tuple.Key.GetSourceFileLocation()} [no auto update possible, some line content changed?]";
+                            Console.WriteLine(message);
+
+                            Logger.Info(message);
+                        }
+                    }
+
                     continue;
                 }
 
+
                 //here at least 1 in the same doc location (and watch expression position) changed
-                //so update the whole expression (keep the not changed values but update where UsedBottomOffset)
+
+                //so update the whole expression (keep the not changed values but 
+                //update where TriedBottomOffset or TriedSearchFileOffset)
 
                 var expressionAndSnapshotTuples = tuples
                     .Select(p => (p.Key, p.Value.wasEqual, p.Value.newSnapshot)).ToList();
@@ -657,12 +723,94 @@ namespace watchCode
                  */
                 var updated = DocsHelper.UpdateWatchExpressionInDocFile(expressionAndSnapshotTuples,
                     DynamicConfig.KnownFileExtensionsWithoutExtension, DynamicConfig.InitWatchExpressionKeywords,
-                    config);
+                    config, out var updateWatchExpressionsList);
+
+                foreach (var tuple in tuples)
+                {
+                    if (tuple.Value.wasEqual)
+                    {
+                        var updateTuple =
+                            updateWatchExpressionsList.FirstOrDefault(p =>
+                                p.oldWatchExpression == tuple.Key);
+
+
+                        if (updated && updateTuple.Equals(
+                                default((WatchExpression oldWatchExpression, WatchExpression updateWatchExpression))) ==
+                            false)
+                        {
+                            Console.BackgroundColor = OkResultBgColor;
+                            Console.Write(WarningResultString);
+                            Console.ResetColor();
+
+                            var message =
+                                $" {tuple.Key.GetDocumentationLocation()} -> new: " +
+                                $"{updateTuple.updateWatchExpression.GetSourceFileLocation()} (old: " +
+                                $"{updateTuple.oldWatchExpression.GetSourceFileLocation()}) [auto updated]";
+                            Console.WriteLine(message);
+
+                            Logger.Info(message);
+                        }
+                        else if (updated && updateTuple.Equals(
+                                     default((WatchExpression oldWatchExpression, WatchExpression updateWatchExpression)
+                                     )))
+                        {
+                            //snapshots were equal and don't need to be updated
+                            //but because this is part of a watch expression where SOME other expression needs to 
+                            //be updated this was also rewritten
+                            
+                            Console.BackgroundColor = OkResultBgColor;
+                            Console.Write(OkResultString);
+                            Console.ResetColor();
+                            
+                            var message =
+                                $" {tuple.Key.GetDocumentationLocation()} -> {tuple.Key.GetSourceFileLocation()} [not changed]";
+                            Console.WriteLine(message);
+
+                            Logger.Info(message);
+                            
+                        }
+                        else
+                        {
+                            Console.BackgroundColor = ChangedResultBgColor;
+                            Console.Write(ChangedResultString);
+                            Console.ResetColor();
+
+                            var message =
+                                $" {tuple.Key.GetDocumentationLocation()} -> {tuple.Key.GetSourceFileLocation()} [error during auto update]";
+                            Console.WriteLine(message);
+
+                            Logger.Info(message);
+                        }
+                    }
+                    else
+                    {
+                        Console.BackgroundColor = ChangedResultBgColor;
+                        Console.Write(ChangedResultString);
+                        Console.ResetColor();
+                        var message =
+                            $" {tuple.Key.GetDocumentationLocation()} -> {tuple.Key.GetSourceFileLocation()} [no auto update possible, some line content changed?]";
+                        Console.WriteLine(message);
+
+                        Logger.Info(message);
+                    }
+                }
             }
+
+            Stopwatch.Stop();
+            Logger.Info($"--- end updating docs (took {StopWatchHelper.GetElapsedTime(Stopwatch)})---");
         }
 
         static void PrintHelp()
         {
+//            Console.WriteLine("seems that you need to update the line range because" +
+//                              "some lines in some files were inserted...");
+//            Console.WriteLine("you can run the command compare and update docs to automatically update" +
+//                              "the line ranges...");
+//
+//            Console.ForegroundColor = ConsoleColor.Red;
+//            Console.WriteLine("...this will rewrite the watch expression comments and delete every text " +
+//                              "before and after the watch expression inside the corresponding comment");
+//            Console.ResetColor();
         }
     }
 }

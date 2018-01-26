@@ -1,6 +1,8 @@
-﻿namespace watchCode.model
+﻿using System;
+
+namespace watchCode.model
 {
-    public struct WatchExpression : ISnapshotLike
+    public class WatchExpression : ISnapshotLike
     {
         /// <summary>
         /// the source file path
@@ -24,6 +26,12 @@
         /// </summary>
         public LineRange DocumentationLineRange { get; set; }
 
+        [Obsolete("do not use, only here because of json deserialization")]
+        public WatchExpression()
+        {
+            
+        }
+        
 
         public WatchExpression(string watchExpressionFilePath, LineRange lineRange, string documentationFilePath,
             LineRange documentationLineRange)
@@ -107,7 +115,35 @@
         {
             return DocumentationFilePath + ", " + DocumentationLineRange.Start + "-" + DocumentationLineRange.End;
         }
-        
+
+
+        public static bool operator ==(WatchExpression w1, WatchExpression w2)
+        {
+            if (ReferenceEquals(w1, w2))
+            {
+                return true;
+            }
+
+            if (ReferenceEquals(w1, null))
+            {
+                return false;
+            }
+            if (ReferenceEquals(w2, null))
+            {
+                return false;
+            }
+
+            return w1.DocumentationFilePath == w2.DocumentationFilePath &&
+                   w1.DocumentationLineRange == w2.DocumentationLineRange &&
+                   w1.WatchExpressionFilePath == w2.WatchExpressionFilePath &&
+                   w1.LineRange == w2.LineRange;
+        }
+
+        public static bool operator !=(WatchExpression w1, WatchExpression w2)
+        {
+            return !(w1 == w2);
+        }
+
         public string GetSourceFileLocation()
         {
             return ToString();

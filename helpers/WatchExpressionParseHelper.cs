@@ -133,7 +133,7 @@ namespace watchCode.helpers
                 watchExpressionString.Split(new char[] {','}, StringSplitOptions.RemoveEmptyEntries);
 
 
-            WatchExpression? previousWatchExpression = null;
+            WatchExpression previousWatchExpression = null;
             foreach (var expressionString in possibleWatchExpressionStrings)
             {
                 var watchExpresion =
@@ -142,7 +142,7 @@ namespace watchCode.helpers
 
                 if (watchExpresion == null) continue;
 
-                watchExpressions.Add(watchExpresion.Value);
+                watchExpressions.Add(watchExpresion);
                 previousWatchExpression = watchExpresion;
             }
 
@@ -151,8 +151,8 @@ namespace watchCode.helpers
         }
 
 
-        private static WatchExpression? ParseSingleWatchExpression(string possibleWatchExpression, FileInfo fileInfo,
-            LineRange watchExpressionFoundLineRange, WatchExpression? previousWatchExpression)
+        private static WatchExpression ParseSingleWatchExpression(string possibleWatchExpression, FileInfo fileInfo,
+            LineRange watchExpressionFoundLineRange, WatchExpression previousWatchExpression)
         {
             possibleWatchExpression = possibleWatchExpression.Trim();
 
@@ -222,12 +222,12 @@ namespace watchCode.helpers
                     return null;
                 }
 
-                filePath = previousWatchExpression.Value.WatchExpressionFilePath;
+                filePath = previousWatchExpression.WatchExpressionFilePath;
 
                 //make sure the doc file position is the same
                 return new WatchExpression(filePath, lineRang, documentationFileRelativePath,
-                    new LineRange(previousWatchExpression.Value.DocumentationLineRange.Start,
-                        previousWatchExpression.Value.DocumentationLineRange.End));
+                    new LineRange(previousWatchExpression.DocumentationLineRange.Start,
+                        previousWatchExpression.DocumentationLineRange.End));
             }
 
             var lineRangString = possibleWatchExpression.Substring(builder.Length);
