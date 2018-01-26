@@ -20,6 +20,8 @@ namespace watchCode
 
             var (cmdArgs, config) = CmdArgsHelper.ParseArgs(args);
 
+            Logger.OutputLogToConsole = true;
+
             return Run(cmdArgs, config);
         }
 
@@ -37,13 +39,14 @@ namespace watchCode
             //after updating docs all bottom to top snapshots are invalid (ranges)
             //after the docs update we don't know which snapshot belongs to which doc watch expression...
 
-            //TODO maybe update the snapshots with the docs because the content of the snapshot won't change
-            //only the line numbers...
+           
 
             //cmdArgs.CompareAndUpdateDocs = true;
 
 
             config.DirsToIgnore.Add(DynamicConfig.GetAbsoluteWatchCodeDirPath(config.WatchCodeDirName));
+            Logger.Info($"added dir {DynamicConfig.GetAbsoluteWatchCodeDirPath(config.WatchCodeDirName)} to " +
+                        $"ignore list because this is the watch code dir");
 
 
             if (Config.Validate(config, cmdArgs) == false) //this also checks if all files exists
@@ -144,6 +147,9 @@ namespace watchCode
                     UpdateDocCommentWatchExpressions(equalMap, config);
                 }
             }
+
+            if (cmdArgs.WriteLog) Logger.WriteLog(config);
+
 
             return returnCode;
         }
@@ -408,7 +414,7 @@ namespace watchCode
 
                         oldSnapshot = oldSnapshots?.FirstOrDefault(p =>
                             p.LineRange == watchExpression.LineRange || (
-                                p.ReversedLineRange != null && 
+                                p.ReversedLineRange != null &&
                                 DocsHelper.GetNewLineRangeFromReverseLineRange(p) ==
                                 watchExpression.LineRange));
                     }

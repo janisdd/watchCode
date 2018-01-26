@@ -146,7 +146,7 @@ namespace watchCode.model
             foreach (var filePath in config.DirsToIgnore)
             {
                 var absolutePath = DynamicConfig.GetAbsoluteFilePath(filePath);
-                if (!File.Exists(absolutePath))
+                if (!Directory.Exists(absolutePath))
                     Logger.Warn($"ignoring directory on ignore list: {absolutePath} because it does not exist");
             }
 

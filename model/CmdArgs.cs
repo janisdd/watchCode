@@ -42,6 +42,12 @@ namespace watchCode.model
         /// </summary>
         public bool CompareAndUpdateDocs { get; set; }
 
+        /// <summary>
+        /// writes the log inside the watch code dir
+        /// </summary>
+        public bool WriteLog { get; set; }
+
+
         
         #endregion
     }

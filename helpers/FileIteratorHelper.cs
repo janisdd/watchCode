@@ -42,7 +42,7 @@ namespace watchCode.helpers
 
                     if (!dirInfo.Exists)
                     {
-                        Logger.Warn($"directory not exists: {absoluteDirPath}, ignoring");
+                        Logger.Info($"directory not exists: {absoluteDirPath}, ignoring");
                         continue;
                     }
 
@@ -96,7 +96,7 @@ namespace watchCode.helpers
 
                     if (!fileInfo.Exists)
                     {
-                        Logger.Warn($"file does not exist: {fileInfo.FullName}");
+                        Logger.Info($"file does not exist: {fileInfo.FullName}");
                         continue;
                     }
 
@@ -110,7 +110,7 @@ namespace watchCode.helpers
 
                     if (fileInfo.Name.StartsWith(HiddenFileStartWithString))
                     {
-                        Logger.Warn($"ignoring file because hidden: {fileInfo.FullName}");
+                        Logger.Info($"ignoring file because hidden: {fileInfo.FullName}");
                         continue;
                     }
 
@@ -135,19 +135,19 @@ namespace watchCode.helpers
             {
                 if (!fileInfo.Exists)
                 {
-                    Logger.Warn($"file does not exist: {fileInfo.FullName}");
+                    Logger.Info($"file does not exist: {fileInfo.FullName}");
                     continue;
                 }
 
                 if (absoluteFilePathsToIgnore.Contains(fileInfo.FullName))
                 {
-                    Logger.Warn($"ignoring file because specified: {fileInfo.FullName}");
+                    Logger.Info($"ignoring file because specified in ignore list: {fileInfo.FullName}");
                     continue;
                 }
 
                 if (absoluteDirPathsToIgnore.Any(p => fileInfo.FullName.StartsWith(p)))
                 {
-                    Logger.Warn($"ignoring file because specified (directory): {fileInfo.FullName}");
+                    Logger.Info($"ignoring file because dir specified in ignore list: {fileInfo.FullName}");
                     continue;
                 }
 
@@ -163,12 +163,12 @@ namespace watchCode.helpers
 
                 if (fileInfo.Name.StartsWith(HiddenFileStartWithString))
                 {
-                    Logger.Warn($"ignoring file because hidden: {fileInfo.FullName}");
+                    Logger.Info($"ignoring file because hidden: {fileInfo.FullName}");
                     continue;
                 }
 
                 fileInfos.Add(fileInfo);
-                Logger.Info($"added file {fileInfo.FullName}");
+                Logger.Info($"added doc file file {fileInfo.FullName}");
             }
 
             return fileInfos;
