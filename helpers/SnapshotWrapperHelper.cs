@@ -82,11 +82,13 @@ namespace watchCode.helpers
             return SnapshotHelper.SaveSnapshot(snapshotDirPath, snapshot, watchExpression, prettyPrintSnapshots);
         }
 
-        public static bool CreateAndSaveSnapshot(WatchExpression watchExpression, Config config)
+        public static bool CreateAndSaveSnapshot(WatchExpression watchExpression, Config config, out Snapshot snapshot)
         {
-            var snapShot = CreateSnapshot(watchExpression);
+            snapshot = CreateSnapshot(watchExpression);
 
-            return SaveSnapshot(snapShot, watchExpression, config);
+            if (snapshot == null) return false;
+
+            return SaveSnapshot(snapshot, watchExpression, config);
         }
 
 

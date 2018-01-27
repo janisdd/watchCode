@@ -37,7 +37,7 @@ namespace watchCode.helpers
                 if (fileInfo.Exists == false)
                 {
                     if (reportErrorIfNotExists)
-                        Logger.Error($"file does not exists, path: {absoluteFilePath}");
+                        Logger.Error($"file does not exist, path: {absoluteFilePath}");
 
                     return false;
                 }
@@ -58,7 +58,7 @@ namespace watchCode.helpers
             //see https://github.com/dotnet/corefx/issues/1745
             //use C: at front to be ablue to use this with dotnet core 1.x
 
-            //TODO not sure if this always works correctly...
+            //TODO maybe not sure if this always works correctly...
 
             absoluteFilePath = "C:" + absoluteFilePath;
             absoluteFolderPath = "C:" + absoluteFolderPath;

@@ -150,6 +150,7 @@ namespace watchCode.model
                     Logger.Warn($"ignoring directory on ignore list: {absolutePath} because it does not exist");
             }
 
+            
             return true;
         }
 

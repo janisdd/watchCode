@@ -22,15 +22,14 @@ namespace watchCode
         public static ConsoleColor WarningResultBgColor = ConsoleColor.DarkYellow;
         public static ConsoleColor ChangedResultBgColor = ConsoleColor.DarkRed;
 
-        public static string OkResultString = " PASS ";
+        //all strings should have the same length, looks nicer
+        public static string OkResultString = "  OK  ";
+
+        public static string AutoUpdateResultString = " AUTO ";
         public static string WarningResultString = " WARN ";
         public static string ChangedResultString = " FAIL ";
 
-        //TODO after updating docs --> old snapshots are invalid (wrong line rang)
-        //--> after updating docs update old snapshots (re crete) only for those expressions
-        //where we automatically updated
-        //use bulk update ...
-
+        
         static int Main(string[] args)
         {
             TotalStopwatch.Start();
@@ -67,15 +66,15 @@ namespace watchCode
 //            Logger.OutputLogToConsole = true;
 
 
-            //cmdArgs.Init = true;
-//            cmdArgs.Update = true;
-            cmdArgs.Compare = true;
+//            cmdArgs.MainAction = MainAction.Init;
+//            cmdArgs.MainAction = MainAction.Update;
+            cmdArgs.MainAction = MainAction.Compare;
 
             //after updating docs all bottom to top snapshots are invalid (ranges)
             //after the docs update we don't know which snapshot belongs to which doc watch expression...
 
 
-//            cmdArgs.CompareAndUpdateDocs = true;
+            cmdArgs.CompareAndUpdateDocs = true;
 
 
             config.DirsToIgnore.Add(DynamicConfig.GetAbsoluteWatchCodeDirPath(config));
@@ -119,8 +118,6 @@ namespace watchCode
                 allWatchExpressions.AddRange(watchExpressions);
             }
 
-            #endregion
-
 
             if (allWatchExpressions.Count == 0)
             {
@@ -130,6 +127,8 @@ namespace watchCode
             Stopwatch.Stop();
             Logger.Info(
                 $"--- end getting all watch expressions (took {StopWatchHelper.GetElapsedTime(Stopwatch)}) ---");
+
+            #endregion
 
             //make sure we don't watch the same (source) lines in the same doc file rang...
             //e.g. if a doc file has 1 watch expression with >= 2 expressions watching the same source file range
@@ -159,16 +158,30 @@ namespace watchCode
             Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap;
 
 
-            NoReduceWatchExpressionsRun(allWatchExpressions, cmdArgs, config, out equalMap);
+            NoReduceWatchExpressionsRun(allWatchExpressions, cmdArgs.MainAction, config,
+                out equalMap,
+                out var initedSnapshots,
+                out var createdAndUpdatedSnapshots);
 
             Stopwatch.Stop();
             Logger.Info($"--- end main part (took {StopWatchHelper.GetElapsedTime(Stopwatch)}) ---");
 
             #endregion
 
-            if (cmdArgs.Compare)
+
+            #region --- output / results
+
+            if (cmdArgs.MainAction == MainAction.Init)
             {
-                OutputEqualsResults(equalMap, out var someSnapshotChanged,
+                OutputInitResults(initedSnapshots);
+            }
+            else if (cmdArgs.MainAction == MainAction.Update)
+            {
+                OutputUpdateResults(createdAndUpdatedSnapshots);
+            }
+            else if (cmdArgs.MainAction == MainAction.Compare)
+            {
+                OutputCompareResults(equalMap, out var someSnapshotChanged,
                     out var someSnapshotUsedBottomToTopOrSearchLines, false);
 
                 if (someSnapshotUsedBottomToTopOrSearchLines) returnCode = NeedToUpdateDocRanges;
@@ -184,24 +197,31 @@ namespace watchCode
                 }
             }
 
+            #endregion
+
             if (cmdArgs.WriteLog) Logger.WriteLog(config);
 
             return returnCode;
         }
 
         /// <summary>
-        /// 
         /// </summary>
         /// <param name="allWatchExpressions"></param>
-        /// <param name="cmdArgs"></param>
+        /// <param name="mainAction"></param>
         /// <param name="config"></param>
         /// <param name="equalMap">one entry for every item in allWatchExpressions</param>
-        private static void NoReduceWatchExpressionsRun(List<WatchExpression> allWatchExpressions, CmdArgs cmdArgs,
+        /// <param name="initedSnapshots"></param>
+        /// <param name="createdAndUpdatedSnapshots"></param>
+        private static void NoReduceWatchExpressionsRun(List<WatchExpression> allWatchExpressions,
+            MainAction mainAction,
             Config config,
-            out Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap)
+            out Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap,
+            out List<(WatchExpression watchExpression, Snapshot snapshot, bool snapshotAlreadyExists)> initedSnapshots,
+            out List<(WatchExpression watchExpression, Snapshot snapshot)> createdAndUpdatedSnapshots
+        )
         {
             var snapshotsDictionary =
-                new Dictionary<string, List<(Snapshot snapshot, WatchExpression watchExpression)>>();
+                new Dictionary<string, List<(WatchExpression watchExpression, Snapshot snapshot)>>();
 
             var alreadyReadSnapshots = new Dictionary<string, List<Snapshot>>();
 
@@ -209,29 +229,54 @@ namespace watchCode
             equalMap =
                 new Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)>();
 
+
+            initedSnapshots =
+                new List<(WatchExpression watchExpression, Snapshot snapshot, bool snapshotAlreadyExists)>();
+
+
+            //update includes init...
+            createdAndUpdatedSnapshots = new List<(WatchExpression watchExpression, Snapshot snapshot)>();
+
             foreach (var watchExpression in allWatchExpressions)
             {
                 Logger.Info($"evaluating watch expression in doc file: {watchExpression.GetDocumentationLocation()}, " +
                             $"watching source file: {watchExpression.GetSourceFileLocation()}");
 
-                EvaulateSingleWatchExpression(watchExpression, cmdArgs, config,
-                    snapshotsDictionary, alreadyReadSnapshots, equalMap);
+                if (mainAction == MainAction.Init)
+                {
+                    PerformInitAction(watchExpression, config, snapshotsDictionary, alreadyReadSnapshots,
+                        initedSnapshots);
+                }
+                else if (mainAction == MainAction.Update)
+                {
+                    PerformUpdateAction(watchExpression, config, snapshotsDictionary, createdAndUpdatedSnapshots);
+                }
+                else if (mainAction == MainAction.Compare)
+                {
+                    PerformCompareAction(watchExpression, config, alreadyReadSnapshots, equalMap);
+                }
             }
 
-            if (cmdArgs.Init || cmdArgs.Update)
+
+            if (mainAction == MainAction.Init || mainAction == MainAction.Update)
             {
                 // ReSharper disable once PossibleInvalidOperationException
                 if (config.CombineSnapshotFiles.Value)
                 {
                     //we haven't written any snapshots yet...
-                    BulkWriteCapturedSnapshots(config, snapshotsDictionary);
+                    BulkWriteCapturedSnapshots(config, snapshotsDictionary, mainAction, initedSnapshots,
+                        createdAndUpdatedSnapshots);
                 }
                 //else already created in EvaulateSingleWatchExpression
             }
         }
 
         private static void BulkWriteCapturedSnapshots(Config config,
-            Dictionary<string, List<(Snapshot snapshot, WatchExpression watchExpression)>> snapshotsDictionary)
+            Dictionary<string, List<(WatchExpression watchExpression, Snapshot snapshot)>> snapshotsDictionary,
+            MainAction mainAction,
+            List<(WatchExpression watchExpression, Snapshot snapshot, bool snapshotAlreadyExists)> initedSnapshots,
+            List<(WatchExpression watchExpression, Snapshot snapshot)> createdAndUpdatedSnapshots
+        )
         {
             Logger.Info($"----- bulk writing snapshots -----");
 
@@ -246,13 +291,64 @@ namespace watchCode
                 bool created =
                     SnapshotWrapperHelper.SaveSnapshots(pair.Value.Select(p => p.snapshot).ToList(), config);
 
-                if (pair.Value.Count > 0)
+
+                if (created)
                 {
-                    (Snapshot snapshot, WatchExpression watchExpression) firstTuple = pair.Value.First();
+                    (WatchExpression watchExpression, Snapshot snapshot) firstTuple = pair.Value.First();
                     Logger.Info(
                         $"snapshot for all watch expressions in for doc " +
                         $"file: {firstTuple.watchExpression.GetDocumentationLocation()} was created at: " +
                         $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), firstTuple.watchExpression, true)}");
+                }
+                else
+                {
+                    if (mainAction == MainAction.Init)
+                    {
+                        //we need to update initedSnapshots properly
+                        //because we captured the snapshot but was not saved
+
+                        foreach (var tuple in pair.Value)
+                        {
+                            var notSavedSnapshotTuple =
+                                initedSnapshots.FirstOrDefault(p => p.snapshot == tuple.snapshot);
+
+                            if (notSavedSnapshotTuple.Equals(
+                                default((WatchExpression watchExpression, Snapshot snapshot, bool snapshotAlreadyExists)
+                                )))
+                            {
+                                Logger.Error($"could not find inited snapshot to set result to failed " +
+                                             $"(because bulk write failed), " +
+                                             $"doc file: {tuple.watchExpression.GetDocumentationLocation()}, " +
+                                             $"source file: {tuple.watchExpression.GetSourceFileLocation()}");
+                                continue;
+                            }
+
+                            notSavedSnapshotTuple.snapshot = null;
+                        }
+                    }
+                    else if (mainAction == MainAction.Update)
+                    {
+                        //we need to set createdAndUpdatedSnapshots properly
+                        //because we captured the snapshot but was not saved
+                        foreach (var tuple in pair.Value)
+                        {
+                            var notSavedSnapshotTuple =
+                                createdAndUpdatedSnapshots.FirstOrDefault(p => p.snapshot == tuple.snapshot);
+
+                            if (notSavedSnapshotTuple.Equals(
+                                default((WatchExpression watchExpression, Snapshot snapshot)
+                                )))
+                            {
+                                Logger.Error($"could not find updated snapshot to set result to failed " +
+                                             $"(because bulk write failed), " +
+                                             $"doc file: {tuple.watchExpression.GetDocumentationLocation()}, " +
+                                             $"source file: {tuple.watchExpression.GetSourceFileLocation()}");
+                                continue;
+                            }
+
+                            notSavedSnapshotTuple.snapshot = null;
+                        }
+                    }
                 }
             }
 
@@ -260,263 +356,339 @@ namespace watchCode
         }
 
 
-        private static void EvaulateSingleWatchExpression(WatchExpression watchExpression, CmdArgs cmdArgs,
-            Config config,
-            Dictionary<string, List<(Snapshot snapshot, WatchExpression watchExpression)>> snapshotsDictionary,
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="watchExpression"></param>
+        /// <param name="config"></param>
+        /// <param name="snapshotsDictionary"></param>
+        /// <param name="alreadyReadSnapshots"></param>
+        /// <param name="capturedSnapshots">
+        /// if snapshot == null && snapshotAlreadyExists -> we haven't captured snapshot because it already exists
+        /// if snapshot == null && snapshotAlreadyExists == false -> error capturing snapshot
+        /// if snapshot != null && snapshotAlreadyExists == true -> should not happen
+        /// if snapshot != null && snapshotAlreadyExists == false -> captured snapshot
+        /// </param>
+        private static void PerformInitAction(WatchExpression watchExpression, Config config,
+            Dictionary<string, List<(WatchExpression watchExpression, Snapshot snapshot)>> snapshotsDictionary,
             Dictionary<string, List<Snapshot>> alreadyReadSnapshots,
-            Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap
+            List<(WatchExpression watchExpression, Snapshot snapshot, bool snapshotAlreadyExists)> capturedSnapshots
         )
         {
-            if (cmdArgs.Init)
+            #region --- init option
+
+            // ReSharper disable once PossibleInvalidOperationException
+            if (config.CombineSnapshotFiles.Value)
             {
-                #region --- init option
+                //because we store combined snapshots we read all snapshots in the file
+                //actually we would only need to read until we found the right snapshot but we assume
+                //that we almost every time need to read all snapshots from the file anyway
 
-                // ReSharper disable once PossibleInvalidOperationException
-                if (config.CombineSnapshotFiles.Value)
+                //so store the already read snapshots
+
+                bool singleSnapshotExists = false;
+
+                if (alreadyReadSnapshots.TryGetValue(watchExpression.WatchExpressionFilePath,
+                    out var alreayReadSnapshots))
                 {
-                    //because we store combined snapshots we read all snapshots in the file
-                    //actually we would only need to read until we found the right snapshot but we assume
-                    //that we almost every time need to read all snapshots from the file anyway
-
-                    //so store the already read snapshots
-
-                    bool singleSnapshotExists = false;
-
-                    if (alreadyReadSnapshots.TryGetValue(watchExpression.WatchExpressionFilePath,
-                        out var alreayReadSnapshots))
-                    {
-                        if (alreayReadSnapshots.Any(p => p.LineRange == watchExpression.LineRange))
-                            singleSnapshotExists = true;
-                    }
-                    else
-                    {
-                        singleSnapshotExists =
-                            SnapshotHelper.SnapshotCombinedExists(
-                                DynamicConfig.GetAbsoluteSnapShotDirPath(config),
-                                watchExpression, out var readSnapshots);
-
-                        if (singleSnapshotExists)
-                        {
-                            alreadyReadSnapshots.Add(watchExpression.WatchExpressionFilePath, readSnapshots);
-                        }
-                    }
+                    if (alreayReadSnapshots.Any(p => p.LineRange == watchExpression.LineRange))
+                        singleSnapshotExists = true;
+                }
+                else
+                {
+                    singleSnapshotExists =
+                        SnapshotHelper.SnapshotCombinedExists(
+                            DynamicConfig.GetAbsoluteSnapShotDirPath(config),
+                            watchExpression, out var readSnapshots);
 
                     if (singleSnapshotExists)
                     {
-                        Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
-                                    $"already exists at: " +
-                                    $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}" +
-                                    $", skipping");
+                        alreadyReadSnapshots.Add(watchExpression.WatchExpressionFilePath, readSnapshots);
                     }
-                    else
-                    {
-                        //do not save the snapshot ... maybe we get snapshots for the same file...
-                        // ReSharper disable once PossibleInvalidOperationException
-                        var newSnapshot =
-                            SnapshotWrapperHelper.CreateSnapshot(watchExpression);
-
-                        //inner func should have reported the error
-                        if (newSnapshot == null) return;
-
-
-                        if (snapshotsDictionary.TryGetValue(watchExpression.WatchExpressionFilePath,
-                            out var snapshots))
-                        {
-                            snapshots.Add((newSnapshot, watchExpression));
-                        }
-                        else
-                        {
-                            snapshotsDictionary.Add(watchExpression.WatchExpressionFilePath,
-                                new List<(Snapshot snapshot, WatchExpression watchExpression)>()
-                                {
-                                    (newSnapshot, watchExpression)
-                                });
-                        }
-                        Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
-                                    $"was added to bulk save: " +
-                                    $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}");
-                    }
-
-                    return;
                 }
 
-                //only create snapshots if they not exit yet
-                //do not touch old snapshots
-                bool snapshotExists =
-                    SnapshotHelper.SnapshotExists(
-                        DynamicConfig.GetAbsoluteSnapShotDirPath(config),
-                        watchExpression);
-
-                if (snapshotExists)
+                if (singleSnapshotExists)
                 {
-                    //do not update, everything ok here
-
                     Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
                                 $"already exists at: " +
                                 $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}" +
                                 $", skipping");
 
+                    capturedSnapshots.Add((watchExpression, null, true));
+
                     return;
                 }
-
-                //create and save new snapshot
-                // ReSharper disable once PossibleInvalidOperationException
-                SnapshotWrapperHelper.CreateAndSaveSnapshot(watchExpression, config);
-
-                Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
-                            $"was created at: " +
-                            $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}");
-
-                #endregion
-            }
-
-            else if (cmdArgs.Update)
-            {
-                #region --- update option
-
-                //update all snapshots ...
-                //update old snapshots
-                //create new snapshots
-
-                // ReSharper disable once PossibleInvalidOperationException
-                if (config.CombineSnapshotFiles.Value)
+                else
                 {
+                    //do not save the snapshot yet... maybe we get snapshots for the same file...
                     // ReSharper disable once PossibleInvalidOperationException
                     var newSnapshot =
                         SnapshotWrapperHelper.CreateSnapshot(watchExpression);
 
-                    if (newSnapshot != null &&
-                        snapshotsDictionary.TryGetValue(watchExpression.WatchExpressionFilePath, out var snapshots))
+                    //inner func should have reported the error
+                    if (newSnapshot == null)
                     {
-                        snapshots.Add((newSnapshot, watchExpression));
-                    }
-                    else if (newSnapshot != null)
-                    {
-                        snapshotsDictionary.Add(watchExpression.WatchExpressionFilePath,
-                            new List<(Snapshot snapshot, WatchExpression watchExpression)>()
-                            {
-                                (newSnapshot, watchExpression)
-                            });
-                    }
-                    else // newSnapshot == null
-                    {
-                        //error already produced in CreateSnapshot
+                        capturedSnapshots.Add((watchExpression, null, false));
                         return;
                     }
 
 
+                    if (snapshotsDictionary.TryGetValue(watchExpression.WatchExpressionFilePath,
+                        out var snapshots))
+                    {
+                        //add the snapshot to the others for the same source file (to bulk write)
+                        snapshots.Add((watchExpression, newSnapshot));
+                    }
+                    else
+                    {
+                        snapshotsDictionary.Add(watchExpression.WatchExpressionFilePath,
+                            new List<( WatchExpression watchExpression, Snapshot snapshot)>()
+                            {
+                                (watchExpression, newSnapshot)
+                            });
+                    }
+
                     Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
-                                $"was added at: " +
+                                $"was added to bulk save: " +
                                 $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}");
 
+                    capturedSnapshots.Add((watchExpression, newSnapshot, false));
+                }
+
+                return;
+            }
+
+            //only create snapshots if they not exit yet
+            //do not touch old snapshots
+            bool snapshotExists =
+                SnapshotHelper.SnapshotExists(
+                    DynamicConfig.GetAbsoluteSnapShotDirPath(config),
+                    watchExpression);
+
+            if (snapshotExists)
+            {
+                //do not update, everything ok here
+
+                Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
+                            $"already exists at: " +
+                            $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}" +
+                            $", skipping");
+
+                capturedSnapshots.Add((watchExpression, null, true));
+                return;
+            }
+
+            //create and save new snapshot
+            // ReSharper disable once PossibleInvalidOperationException
+            bool created = SnapshotWrapperHelper.CreateAndSaveSnapshot(watchExpression, config, out var snapshot);
+
+            if (created)
+            {
+                capturedSnapshots.Add((watchExpression, snapshot, false));
+            }
+            else
+            {
+                capturedSnapshots.Add((watchExpression, null, false));
+            }
+
+            Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
+                        $"was created at: " +
+                        $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}");
+
+            #endregion
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="watchExpression"></param>
+        /// <param name="config"></param>
+        /// <param name="snapshotsDictionary"></param>
+        /// <param name="capturedSnapshots">
+        /// if snapshot == null -> error capturing snapshot
+        /// if snapshot != null -> captured snapshot
+        /// </param>
+        private static void PerformUpdateAction(WatchExpression watchExpression, Config config, Dictionary<string,
+                List<(WatchExpression watchExpression, Snapshot snapshot)>> snapshotsDictionary,
+            List<(WatchExpression watchExpression, Snapshot snapshot)> capturedSnapshots)
+        {
+            #region --- update option
+
+            //update all snapshots ...
+            //update old snapshots
+            //create new snapshots
+
+            // ReSharper disable once PossibleInvalidOperationException
+            if (config.CombineSnapshotFiles.Value)
+            {
+                // ReSharper disable once PossibleInvalidOperationException
+                var newSnapshot =
+                    SnapshotWrapperHelper.CreateSnapshot(watchExpression);
+
+                if (newSnapshot != null &&
+                    snapshotsDictionary.TryGetValue(watchExpression.WatchExpressionFilePath, out var snapshots))
+                {
+                    //add the snapshot to the others for the same source file (to bulk write)
+                    snapshots.Add((watchExpression, newSnapshot ));
+                }
+                else if (newSnapshot != null)
+                {
+                    snapshotsDictionary.Add(watchExpression.WatchExpressionFilePath,
+                        new List<(WatchExpression watchExpression, Snapshot snapshot )>()
+                        {
+                            (watchExpression, newSnapshot )
+                        });
+                }
+                else // newSnapshot == null
+                {
+                    //error already produced in CreateSnapshot
+
+                    capturedSnapshots.Add((watchExpression, null));
                     return;
                 }
 
-                //create and save new snapshot
-                // ReSharper disable once PossibleInvalidOperationException
-                SnapshotWrapperHelper.CreateAndSaveSnapshot(watchExpression, config);
+                capturedSnapshots.Add((watchExpression, newSnapshot));
+
+                Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
+                            $"was added at: " +
+                            $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}");
+
+                return;
+            }
+
+            //create and save new snapshot
+            // ReSharper disable once PossibleInvalidOperationException
+            bool created = SnapshotWrapperHelper.CreateAndSaveSnapshot(watchExpression, config, out var snapshot);
+
+            if (created)
+            {
+                capturedSnapshots.Add((watchExpression, snapshot));
 
                 Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
                             $"was saved at: " +
                             $"{SnapshotHelper.GetAbsoluteSnapshotFilePath(DynamicConfig.GetAbsoluteSnapShotDirPath(config), watchExpression, true)}");
+            }
+            else
+            {
+                capturedSnapshots.Add((watchExpression, null));
 
-                #endregion
+                Logger.Info($"snapshot for doc file: {watchExpression.GetDocumentationLocation()} " +
+                            $"was not saved");
             }
 
-            else if (cmdArgs.Compare)
+            #endregion
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="watchExpression"></param>
+        /// <param name="config"></param>
+        /// <param name="alreadyReadSnapshots"></param>
+        private static void PerformCompareAction(WatchExpression watchExpression, Config config,
+            Dictionary<string, List<Snapshot>> alreadyReadSnapshots,
+            Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap)
+        {
+            #region --- compare option
+
+            // ReSharper disable once PossibleInvalidOperationException
+            string oldSnapshotPath = SnapshotHelper.GetAbsoluteSnapshotFilePath(
+                DynamicConfig.GetAbsoluteSnapShotDirPath(config),
+                watchExpression, config.CombineSnapshotFiles.Value);
+
+            Snapshot oldSnapshot;
+
+            if (config.CombineSnapshotFiles.Value)
             {
-                #region --- compare option
+                //because we store combined snapshots we need to read every snapshot from the file anyway...
+                //so store them
 
-                // ReSharper disable once PossibleInvalidOperationException
-                string oldSnapshotPath = SnapshotHelper.GetAbsoluteSnapshotFilePath(
-                    DynamicConfig.GetAbsoluteSnapShotDirPath(config),
-                    watchExpression, config.CombineSnapshotFiles.Value);
-
-                Snapshot oldSnapshot;
-
-                if (config.CombineSnapshotFiles.Value)
+                if (alreadyReadSnapshots.TryGetValue(watchExpression.WatchExpressionFilePath,
+                    out var alreayReadSnapshots))
                 {
-                    //because we store combined snapshots we need to read every snapshot from the file anyway...
-                    //so store them
-
-                    if (alreadyReadSnapshots.TryGetValue(watchExpression.WatchExpressionFilePath,
-                        out var alreayReadSnapshots))
+                    if (alreayReadSnapshots == null)
                     {
-                        oldSnapshot = alreayReadSnapshots.FirstOrDefault(p => p.LineRange == watchExpression.LineRange);
+                        oldSnapshot = null;
                     }
                     else
                     {
-                        List<Snapshot> oldSnapshots = SnapshotWrapperHelper.ReadSnapshots(oldSnapshotPath);
-                        alreadyReadSnapshots.Add(watchExpression.WatchExpressionFilePath, oldSnapshots);
-
-
-                        oldSnapshot = oldSnapshots?.FirstOrDefault(p =>
-                            p.LineRange == watchExpression.LineRange || (
-                                p.ReversedLineRange != null &&
-                                DocsHelper.GetNewLineRangeFromReverseLineRange(p) ==
-                                watchExpression.LineRange));
+                        oldSnapshot =
+                            alreayReadSnapshots.FirstOrDefault(p => p.LineRange == watchExpression.LineRange);
                     }
                 }
                 else
                 {
-                    oldSnapshot = SnapshotWrapperHelper.ReadSnapshot(oldSnapshotPath);
+                    List<Snapshot> oldSnapshots = SnapshotWrapperHelper.ReadSnapshots(oldSnapshotPath);
+                    //oldSnapshots can be null!! but we need to know if we already read the file.. so keep null
+                    alreadyReadSnapshots.Add(watchExpression.WatchExpressionFilePath, oldSnapshots);
+
+
+                    oldSnapshot = oldSnapshots?.FirstOrDefault(p =>
+                        p.LineRange == watchExpression.LineRange || (
+                            p.ReversedLineRange != null &&
+                            DocsHelper.GetNewLineRangeFromReverseLineRange(p) ==
+                            watchExpression.LineRange));
                 }
-
-
-                bool areEqual;
-
-                Snapshot newSnapshot = null;
-
-
-                if (oldSnapshot == null)
-                {
-                    //normally this can't happen ... because we created the snapshot...
-                    //but on error or if someone deleted the snapshot in the snapshot dir...
-                    equalMap.Add(watchExpression, (false, null, null));
-
-                    return;
-                }
-                else if (oldSnapshot.LineRange == null || oldSnapshot.ReversedLineRange == null)
-                {
-                    //old snapshot was for the whote file or we don't
-                    //know reversed lines ... so take normal snapshot
-
-                    // ReSharper disable once PossibleInvalidOperationException
-                    newSnapshot =
-                        SnapshotWrapperHelper.CreateSnapshot(watchExpression);
-
-                    areEqual = SnapshotWrapperHelper.AreSnapshotsEqual(oldSnapshot, newSnapshot);
-                }
-                else
-                {
-                    //the old snapshot exists & has the same line ranges...
-
-                    // ReSharper disable once PossibleInvalidOperationException
-                    newSnapshot =
-                        SnapshotWrapperHelper.CreateSnapshotBasedOnOldSnapshot(watchExpression, oldSnapshot,
-                            out var snapshotsWereEqual);
-
-                    areEqual = snapshotsWereEqual;
-                }
-
-
-                if (newSnapshot == null)
-                {
-                    equalMap.Add(watchExpression, (false, oldSnapshot, null));
-                }
-                else
-                {
-                    //already checked in CreateSnapshotBasedOnOldSnapshot
-                    equalMap.Add(watchExpression,
-                        (areEqual, oldSnapshot, newSnapshot));
-                }
-
-                #endregion
             }
+            else
+            {
+                oldSnapshot = SnapshotWrapperHelper.ReadSnapshot(oldSnapshotPath);
+            }
+
+
+            bool areEqual;
+
+            Snapshot newSnapshot = null;
+
+
+            if (oldSnapshot == null)
+            {
+                //normally this can't happen ... because we created the snapshot...
+                //but on error or if someone deleted the snapshot in the snapshot dir...
+                equalMap.Add(watchExpression, (false, null, null));
+
+                return;
+            }
+            else if (oldSnapshot.LineRange == null || oldSnapshot.ReversedLineRange == null)
+            {
+                //old snapshot was for the whote file or we don't
+                //know reversed lines ... so take normal snapshot
+
+                // ReSharper disable once PossibleInvalidOperationException
+                newSnapshot =
+                    SnapshotWrapperHelper.CreateSnapshot(watchExpression);
+
+                areEqual = SnapshotWrapperHelper.AreSnapshotsEqual(oldSnapshot, newSnapshot);
+            }
+            else
+            {
+                //the old snapshot exists & has the same line ranges...
+
+                // ReSharper disable once PossibleInvalidOperationException
+                newSnapshot =
+                    SnapshotWrapperHelper.CreateSnapshotBasedOnOldSnapshot(watchExpression, oldSnapshot,
+                        out var snapshotsWereEqual);
+
+                areEqual = snapshotsWereEqual;
+            }
+
+
+            if (newSnapshot == null)
+            {
+                equalMap.Add(watchExpression, (false, oldSnapshot, null));
+            }
+            else
+            {
+                //already checked in CreateSnapshotBasedOnOldSnapshot
+                equalMap.Add(watchExpression,
+                    (areEqual, oldSnapshot, newSnapshot));
+            }
+
+            #endregion
         }
 
 
-        private static void OutputEqualsResults(
+        private static void OutputCompareResults(
             Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap,
             out bool someSnapshotChanged, out bool someSnapshotUsedBottomToTopOrSearchLines, bool suppressOutput)
         {
@@ -528,6 +700,10 @@ namespace watchCode
 
             someSnapshotChanged = false;
             someSnapshotUsedBottomToTopOrSearchLines = false;
+
+            int autoUpdatePossibleCount = 0;
+            int noAutoUpdatePossibleCount = 0;
+            int notChangedCount = 0;
 
             foreach (var pair in equalMap)
             {
@@ -541,16 +717,18 @@ namespace watchCode
                         //user inserted lines before the watched lines
                         someSnapshotUsedBottomToTopOrSearchLines = true;
 
-                        Logger.Info(
-                            $"{watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} needs to be updated (used bottom offset)");
-
                         if (suppressOutput == false)
                         {
                             Console.BackgroundColor = WarningResultBgColor;
                             Console.Write(WarningResultString);
                             Console.ResetColor();
-                            Console.WriteLine(
-                                $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} needs to be updated [used bottom offset]");
+                            var message =
+                                $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} [needs to be updated, used bottom offset]";
+                            Console.WriteLine(message);
+
+                            Logger.Info(message);
+
+                            autoUpdatePossibleCount++;
                         }
                     }
                     else if (tuple.newSnapshot.TriedSearchFileOffset)
@@ -558,28 +736,33 @@ namespace watchCode
                         someSnapshotUsedBottomToTopOrSearchLines = true;
 
                         //user inserted lines before and after the watched lines --> line range is totaly wrong now
-                        Logger.Info(
-                            $"{watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} needs to be updated (used search)");
 
                         if (suppressOutput == false)
                         {
                             Console.BackgroundColor = WarningResultBgColor;
                             Console.Write(WarningResultString);
                             Console.ResetColor();
-                            Console.WriteLine(
-                                $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} needs to be updated [used search]");
+                            var message =
+                                $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} [needs to be updated, used search]";
+                            Console.WriteLine(message);
+
+                            Logger.Info(message);
+
+                            autoUpdatePossibleCount++;
                         }
                     }
-                    else
+                    else //nothing changed
                     {
-                        Logger.Info(
-                            $"{watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()}");
-
                         Console.BackgroundColor = OkResultBgColor;
                         Console.Write(OkResultString);
                         Console.ResetColor();
-                        Console.WriteLine(
-                            $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()}");
+                        var message =
+                            $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()}";
+                        Console.WriteLine(message);
+
+                        Logger.Info(message);
+
+                        notChangedCount++;
                     }
                 }
                 else
@@ -599,13 +782,36 @@ namespace watchCode
 
                         if (sourceFileExists)
                         {
-                            Console.WriteLine(
-                                $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} [changed]");
+                            if (tuple.oldSnapshot == null)
+                            {
+                                var message =
+                                    $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} [no old snapshot found]";
+                                Console.WriteLine(message);
+
+                                Logger.Info(message);
+
+                                noAutoUpdatePossibleCount++;
+                            }
+                            else
+                            {
+                                var message =
+                                    $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} [changed]";
+                                Console.WriteLine(message);
+
+                                Logger.Info(message);
+
+                                noAutoUpdatePossibleCount++;
+                            }
                         }
                         else
                         {
-                            Console.WriteLine(
-                                $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} [deleted/renamed or no permission to access]");
+                            var message =
+                                $" {watchExpression.GetDocumentationLocation()} -> {watchExpression.GetSourceFileLocation()} [deleted/renamed source file or no permission to access]";
+                            Console.WriteLine(message);
+
+                            Logger.Info(message);
+
+                            noAutoUpdatePossibleCount++;
                         }
                     }
                 }
@@ -616,14 +822,26 @@ namespace watchCode
                 if (someSnapshotChanged == false && someSnapshotUsedBottomToTopOrSearchLines == false)
                 {
                     Console.ForegroundColor = OkResultBgColor;
-                    Console.WriteLine("all doc files are ok!");
+                    var message = "all doc files are up to date!";
+                    Console.WriteLine(message);
+                    Logger.Info(message);
                     Console.ResetColor();
                 }
                 else
                 {
                     Console.ForegroundColor = ChangedResultBgColor;
-                    Console.WriteLine("some doc files need to be updated!");
+                    var message = "some doc files need to be updated!";
+                    Console.WriteLine(message);
+                    Logger.Info(message);
                     Console.ResetColor();
+
+                    //TODO more colors!! maybe something with if > 0 ?
+                    Console.WriteLine(
+                        $"{noAutoUpdatePossibleCount} expressions changed and need to be updated manually");
+                    Console.WriteLine(
+                        $"{autoUpdatePossibleCount} expressions changed but can be updated automatically");
+                    Console.WriteLine($"{notChangedCount} expressions hasn't changed");
+                    
                 }
             }
 
@@ -632,12 +850,118 @@ namespace watchCode
         }
 
 
+        private static void OutputInitResults(
+            List<(WatchExpression watchExpression, Snapshot snapshot, bool snapshotAlreadyExists)> initedSnapshots)
+        {
+            Stopwatch.Restart();
+            Logger.Info("--- init results ---");
+            Console.WriteLine($"{new string('-', OkResultString.Length)} init results");
+
+            foreach (var tuple in initedSnapshots)
+            {
+                if (tuple.snapshot == null && tuple.snapshotAlreadyExists)
+                {
+                    Console.BackgroundColor = OkResultBgColor;
+                    Console.Write(OkResultString);
+                    Console.ResetColor();
+                    var message =
+                        $" {tuple.watchExpression.GetDocumentationLocation()} -> {tuple.watchExpression.GetSourceFileLocation()} [snapshot already exists]";
+                    Console.WriteLine(message);
+
+                    Logger.Info(message);
+                }
+                else if (tuple.snapshot == null && tuple.snapshotAlreadyExists == false)
+                {
+                    Console.BackgroundColor = ChangedResultBgColor;
+                    Console.Write(ChangedResultBgColor);
+                    Console.ResetColor();
+                    var message =
+                        $" {tuple.watchExpression.GetDocumentationLocation()} -> {tuple.watchExpression.GetSourceFileLocation()} [could not create snapshot]";
+                    Console.WriteLine(message);
+
+                    Logger.Info(message);
+                }
+                else if (tuple.snapshot != null && tuple.snapshotAlreadyExists)
+                {
+                    Logger.Info(
+                        "should/cannot happen in init mode ... snapshot was created but already existed ... but we do not overwrite in init mode ...");
+
+                    //should/cannot happen
+                    Console.BackgroundColor = ChangedResultBgColor;
+                    Console.Write(ChangedResultBgColor);
+                    Console.ResetColor();
+                    var message =
+                        $" {tuple.watchExpression.GetDocumentationLocation()} -> {tuple.watchExpression.GetSourceFileLocation()} [internal error occured!]";
+                    Console.WriteLine(message);
+
+                    Logger.Info(message);
+                }
+                else //if (tuple.snapshot != null && tuple.snapshotAlreadyExists == false)
+                {
+                    Console.BackgroundColor = OkResultBgColor;
+                    Console.Write(OkResultString);
+                    Console.ResetColor();
+                    var message =
+                        $" {tuple.watchExpression.GetDocumentationLocation()} -> {tuple.watchExpression.GetSourceFileLocation()} [snapshot created]";
+                    Console.WriteLine(message);
+
+                    Logger.Info(message);
+                }
+            }
+
+            Stopwatch.Stop();
+            Logger.Info($"--- end init results (took {StopWatchHelper.GetElapsedTime(Stopwatch)}) ---");
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="createdOrUpdateSnapshots">only the created snapshots, thus we also need the allWatchExpressions to know which we don't updated</param>
+        private static void OutputUpdateResults(
+            List<(WatchExpression watchExpression, Snapshot snapshot)> createdOrUpdateSnapshots)
+        {
+            Stopwatch.Restart();
+            Logger.Info("--- update snapshot results ---");
+            Console.WriteLine($"{new string('-', OkResultString.Length)} update results");
+
+            foreach (var tuple in createdOrUpdateSnapshots)
+            {
+                if (tuple.snapshot == null)
+                {
+                    Console.BackgroundColor = ChangedResultBgColor;
+                    Console.Write(ChangedResultBgColor);
+                    Console.ResetColor();
+                    var message =
+                        $" {tuple.watchExpression.GetDocumentationLocation()} -> {tuple.watchExpression.GetSourceFileLocation()} [snapshot could not be updated]";
+
+                    Console.WriteLine(message);
+
+                    Logger.Info(message);
+                }
+                else
+                {
+                    Console.BackgroundColor = OkResultBgColor;
+                    Console.Write(OkResultString);
+                    Console.ResetColor();
+                    var message =
+                        $" {tuple.watchExpression.GetDocumentationLocation()} -> {tuple.watchExpression.GetSourceFileLocation()} [snapshot updated]";
+                    Console.WriteLine(message);
+
+                    Logger.Info(message);
+                }
+            }
+
+            Stopwatch.Stop();
+            Logger.Info($"--- end update snapshot results (took {StopWatchHelper.GetElapsedTime(Stopwatch)}) ---");
+        }
+
+
         private static void UpdateDocCommentWatchExpressions(
             Dictionary<WatchExpression, (bool wasEqual, Snapshot oldSnapshot, Snapshot newSnapshot)> equalMap,
             Config config)
         {
             Stopwatch.Restart();
-            Logger.Info("--- updating docs ---");
+            Logger.Info("--- auto updating docs ---");
             Console.WriteLine($"{new string('-', OkResultString.Length)} update doc files");
 
             //if not equal we may recover via searching or bottom offset
@@ -648,6 +972,16 @@ namespace watchCode
                     .GroupBy(p => p.Key.GetDocumentationLocation())
                     .ToList()
                 ;
+
+            //the list of all updated watch expressions (where the line range changed)
+            //because we changed the line range the stored snapshots are not invalid (because they have the old
+            //line range ... so re created the snapshot for those where the line range changed)
+
+            var allUpdateWatchExpressionsList =
+                new List<(WatchExpression oldWatchExpression, WatchExpression updatedWatchExpression)>();
+
+
+            #region update line range
 
             foreach (var group in groupedWatchExpressions)
             {
@@ -725,6 +1059,9 @@ namespace watchCode
                     DynamicConfig.KnownFileExtensionsWithoutExtension, DynamicConfig.InitWatchExpressionKeywords,
                     config, out var updateWatchExpressionsList);
 
+
+                allUpdateWatchExpressionsList.AddRange(updateWatchExpressionsList);
+
                 foreach (var tuple in tuples)
                 {
                     if (tuple.Value.wasEqual)
@@ -734,12 +1071,11 @@ namespace watchCode
                                 p.oldWatchExpression == tuple.Key);
 
 
-                        if (updated && updateTuple.Equals(
-                                default((WatchExpression oldWatchExpression, WatchExpression updateWatchExpression))) ==
-                            false)
+                        if (updated && !updateTuple.Equals(
+                                default((WatchExpression oldWatchExpression, WatchExpression updateWatchExpression))))
                         {
                             Console.BackgroundColor = OkResultBgColor;
-                            Console.Write(WarningResultString);
+                            Console.Write(AutoUpdateResultString);
                             Console.ResetColor();
 
                             var message =
@@ -754,20 +1090,19 @@ namespace watchCode
                                      default((WatchExpression oldWatchExpression, WatchExpression updateWatchExpression)
                                      )))
                         {
-                            //snapshots were equal and don't need to be updated
+                            //snapshots were equal and don't need to be updated (line range)
                             //but because this is part of a watch expression where SOME other expression needs to 
                             //be updated this was also rewritten
-                            
+
                             Console.BackgroundColor = OkResultBgColor;
                             Console.Write(OkResultString);
                             Console.ResetColor();
-                            
+
                             var message =
                                 $" {tuple.Key.GetDocumentationLocation()} -> {tuple.Key.GetSourceFileLocation()} [not changed]";
                             Console.WriteLine(message);
 
                             Logger.Info(message);
-                            
                         }
                         else
                         {
@@ -796,9 +1131,39 @@ namespace watchCode
                 }
             }
 
+            #endregion
+
+
+            #region update snapshots where line range changed
+
+            if (allUpdateWatchExpressionsList.Count != 0)
+            {
+                var localStopWatch = new Stopwatch();
+                localStopWatch.Start();
+                Logger.Info("----- auto updating snapshots (where the watch expression line range changed)");
+
+
+                var newWatchExpressions = allUpdateWatchExpressionsList.Select(p => p.updatedWatchExpression).ToList();
+
+                NoReduceWatchExpressionsRun(newWatchExpressions, MainAction.Update, config,
+                    out equalMap,
+                    out var initedSnapshots,
+                    out var createdAndUpdatedSnapshots);
+
+                localStopWatch.Stop();
+                Logger.Info(
+                    $"----- end auto updating snapshots (took {StopWatchHelper.GetElapsedTime(localStopWatch)})");
+
+                OutputUpdateResults(createdAndUpdatedSnapshots);
+            }
+
+            #endregion
+
+
             Stopwatch.Stop();
             Logger.Info($"--- end updating docs (took {StopWatchHelper.GetElapsedTime(Stopwatch)})---");
         }
+
 
         static void PrintHelp()
         {

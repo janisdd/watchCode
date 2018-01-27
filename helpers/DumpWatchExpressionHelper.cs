@@ -21,7 +21,7 @@ namespace watchCode.helpers
 
                 if (fileInfo.Directory.Exists == false)
                 {
-                    Logger.Info($"dum file parent directory does not exists, creating full path...");
+                    Logger.Info($"dump file parent directory does not exist, creating full path...");
                     Directory.CreateDirectory(fileInfo.Directory.FullName);
                     Logger.Info($"... finished creating directory full path for dum file");
                 }

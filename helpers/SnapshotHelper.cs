@@ -89,7 +89,6 @@ namespace watchCode.helpers
             return snapshot;
         }
 
-        //TODO rework logg output
         /// <summary>
         /// </summary>
         /// <param name="absoluteFilePath"></param>
@@ -122,7 +121,7 @@ namespace watchCode.helpers
                 if (fileInfo.Exists == false)
                 {
                     Logger.Error(
-                        $"could not create snapshot for file: {absoluteFilePath} because file does not exists, " +
+                        $"could not create snapshot for file: {absoluteFilePath} because file does not exist, " +
                         $"at doc file: {watchExpression.GetDocumentationLocation()}");
                     return null;
                 }
@@ -251,7 +250,7 @@ namespace watchCode.helpers
                 if (fileInfo.Exists == false)
                 {
                     Logger.Error(
-                        $"could not create snapshot for file: {absoluteFilePath} because file does not exists, " +
+                        $"could not create snapshot for file: {absoluteFilePath} because file does not exist, " +
                         $"at doc file: {watchExpression.GetDocumentationLocation()}");
                     return null;
                 }

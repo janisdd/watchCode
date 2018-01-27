@@ -30,5 +30,21 @@
     ],
     "AllLinesHash": "72e275358e5760fe2ac60cb9d8ec01367c3f24cd60327b5c3a355a26aa16de3c5dca2edbd2d5ca1d760f3d790c9f8b0909709fee7af14eec15281f449b32e3bf",
     "TotalLinesInFile": 12
+  },
+  {
+    "WatchExpressionFilePath": "src/index2.ts",
+    "LineRange": {
+      "Start": 6,
+      "End": 6
+    },
+    "ReversedLineRange": {
+      "Start": 6,
+      "End": 6
+    },
+    "Lines": [
+      "//from https://stackoverflow.com/questions/40200089/is-a-number-prime"
+    ],
+    "AllLinesHash": "cd8b7aba86d1a26a4603cdb8f6c0070316fce1cb2688f80e0ec6a5fd50e15b2fdc07df36784932aa6d886c1e634568e0831333e8ac4e9eb9c5df9523a4f1f36c",
+    "TotalLinesInFile": 12
   }
 ]

@@ -79,7 +79,7 @@ namespace watchCode.helpers
                 if (fileInfo.Exists == false)
                 {
                     Logger.Error($"could not update watch expression in " +
-                                 $"file: {firstWatchExpressionInDocPosition.GetDocumentationLocation()} because file does not exists, " +
+                                 $"file: {firstWatchExpressionInDocPosition.GetDocumentationLocation()} because file does not exist, " +
                                  $"skipping");
 
                     return false;

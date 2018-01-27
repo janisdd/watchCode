@@ -42,7 +42,7 @@ namespace watchCode.helpers
 
                     if (!dirInfo.Exists)
                     {
-                        Logger.Info($"directory not exists: {absoluteDirPath}, ignoring");
+                        Logger.Info($"directory does not exist: {absoluteDirPath}, ignoring");
                         continue;
                     }
 

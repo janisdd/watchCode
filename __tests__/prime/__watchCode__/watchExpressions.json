@@ -2,8 +2,8 @@
   {
     "WatchExpressionFilePath": "src/index.ts",
     "LineRange": {
-      "Start": 8,
-      "End": 11
+      "Start": 7,
+      "End": 10
     },
     "DocumentationFilePath": "docs/doc.md",
     "DocumentationLineRange": {
@@ -14,8 +14,8 @@
   {
     "WatchExpressionFilePath": "src/index.ts",
     "LineRange": {
-      "Start": 7,
-      "End": 7
+      "Start": 6,
+      "End": 6
     },
     "DocumentationFilePath": "docs/doc.md",
     "DocumentationLineRange": {
