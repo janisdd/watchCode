@@ -16,6 +16,10 @@ namespace watchCode.helpers
         public static ConsoleColor WarningColor = ConsoleColor.DarkYellow;
         public static ConsoleColor ErrorColor = ConsoleColor.DarkRed;
 
+        public static ConsoleColor InsertedColor = ConsoleColor.DarkGreen;
+        public static ConsoleColor DeletedColor = ConsoleColor.DarkGreen;
+        public static ConsoleColor EqualColor = Console.ForegroundColor;
+
         private static Queue<string> logQueue = new Queue<string>();
 
         /// <summary>
@@ -100,26 +104,26 @@ namespace watchCode.helpers
                     case LogLevel.None:
                         break;
                     case LogLevel.Info:
+                        
                         Console.ForegroundColor = InfoColor;
+                        
+                        if (LogLevel == LogLevel.Info) Console.WriteLine(message);
+                        
                         break;
+                        
                     case LogLevel.Warn:
                         Console.ForegroundColor = WarningColor;
+
+                        if (LogLevel == LogLevel.Warn || LogLevel == LogLevel.Warn) Console.WriteLine(message);
+                        
                         break;
                     case LogLevel.Error:
                         Console.ForegroundColor = ErrorColor;
+                        Console.Error.WriteLine(message);
                         break;
 
                     default:
                         throw new ArgumentOutOfRangeException(nameof(severityLevel), severityLevel, null);
-                }
-
-                if (LogLevel == LogLevel.Error)
-                {
-                    Console.Error.WriteLine(message);
-                }
-                else
-                {
-                    Console.WriteLine(message);
                 }
 
                 Console.ResetColor();

@@ -62,15 +62,18 @@ namespace watchCode.helpers
 
             absoluteFilePath = "C:" + absoluteFilePath;
             absoluteFolderPath = "C:" + absoluteFolderPath;
-            absoluteFilePath = absoluteFilePath.Replace(Path.DirectorySeparatorChar, '\\');
-            absoluteFolderPath = absoluteFolderPath.Replace(Path.DirectorySeparatorChar, '\\');
-
-            var pathUri = new Uri(absoluteFilePath);
+            
             // Folders must end in a slash
             if (!absoluteFolderPath.EndsWith(Path.DirectorySeparatorChar.ToString()))
             {
                 absoluteFolderPath += Path.DirectorySeparatorChar;
             }
+            
+            absoluteFilePath = absoluteFilePath.Replace(Path.DirectorySeparatorChar, '\\');
+            absoluteFolderPath = absoluteFolderPath.Replace(Path.DirectorySeparatorChar, '\\');
+
+            var pathUri = new Uri(absoluteFilePath);
+            
             var folderUri = new Uri(absoluteFolderPath);
 
             var relativePath = Uri.UnescapeDataString(folderUri.MakeRelativeUri(pathUri).ToString()

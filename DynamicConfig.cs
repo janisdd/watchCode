@@ -6,19 +6,25 @@ namespace watchCode
 {
     public static class DynamicConfig
     {
-        public static string AbsoluteRootDirPath = null;
+        public static string DocFilesDirAbsolutePath = null;
 
-        public static Dictionary<string, List<(string start, string end)>> KnownFileExtensionsWithoutExtension;
+        public static string SourceFilesDirAbsolutePath = null;
+
+        public static Dictionary<string, List<CommentPattern>> KnownFileExtensionsWithoutExtension;
 
         public static List<string> InitWatchExpressionKeywords;
 
         static DynamicConfig()
         {
-            KnownFileExtensionsWithoutExtension = new Dictionary<string, List<(string start, string end)>>();
+            KnownFileExtensionsWithoutExtension = new Dictionary<string, List<CommentPattern>>();
 
-            KnownFileExtensionsWithoutExtension.Add("md", new List<(string start, string end)>()
+            KnownFileExtensionsWithoutExtension.Add("md", new List<CommentPattern>()
             {
-                ("<!--", "-->")
+                new CommentPattern()
+                {
+                    StartCommentPart = "<!--",
+                    EndCommentPart = "-->",
+                }
             });
 
             InitWatchExpressionKeywords = new List<string>()
@@ -29,17 +35,22 @@ namespace watchCode
 
         public static string GetAbsoluteWatchCodeDirPath(Config config)
         {
-            return Path.Combine(AbsoluteRootDirPath, config.WatchCodeDirName);
+            return Path.Combine(DocFilesDirAbsolutePath, config.WatchCodeDirName);
         }
-
-        public static string GetAbsoluteSnapShotDirPath(Config config)
+        
+        
+        public static string GetAbsoluteSnapShotsDirPath(Config config)
         {
             return Path.Combine(GetAbsoluteWatchCodeDirPath(config), config.SnapshotDirName);
         }
 
-        public static string GetAbsoluteFilePath(string watchExpressionFilePath)
+        public static string GetAbsoluteDocFilePath(string watchExpressionFilePath)
         {
-            return Path.Combine(AbsoluteRootDirPath, watchExpressionFilePath);
+            return Path.Combine(DocFilesDirAbsolutePath, watchExpressionFilePath);
+        }
+        public static string GetAbsoluteSourceFilePath(string watchExpressionFilePath)
+        {
+            return Path.Combine(SourceFilesDirAbsolutePath, watchExpressionFilePath);
         }
     }
 }

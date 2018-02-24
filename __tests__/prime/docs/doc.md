@@ -1,6 +1,6 @@
 # docs
 
-<!-- @watch src/index.ts 9-13, 8-9, src/index2.ts 6 -->
+<!-- @watch src/index.ts 7-10, 6, src/index2.ts 6 -->
 
 <!-- @watch src/index2.ts 10 -->
 

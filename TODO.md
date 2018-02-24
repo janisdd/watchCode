@@ -2,6 +2,7 @@
 
 
 
+
 - add option to suppress ok output (if a file hasn't changed we might not be interested in this)
   - so only output if we need auto update
   
@@ -14,7 +15,9 @@
 
 - make readme
 
-- FOR WINDOWS \r\n
+- remove unused snapshots ... option or auto e.g. if we change the range to another (known) range??
+
+- remove reverse line reader... somehow combine top down & search method??
 
 
 - maybe: reduce expressions if y includes x and x changed --> y changed! but if x does not change we don't know for y

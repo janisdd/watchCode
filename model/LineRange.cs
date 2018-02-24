@@ -10,8 +10,8 @@ namespace watchCode.model
         [Obsolete("do not use, only here because of json deserialization")]
         public LineRange()
         {
-            
         }
+
         public LineRange(int start, int end)
         {
             Start = start;
@@ -22,6 +22,15 @@ namespace watchCode.model
         {
             Start = startAndEnd;
             End = startAndEnd;
+        }
+
+        public LineRange Clone()
+        {
+            return new LineRange()
+            {
+                End = this.End,
+                Start = this.Start
+            };
         }
 
         public static bool operator ==(LineRange lr1, LineRange lr2)
@@ -39,7 +48,7 @@ namespace watchCode.model
             {
                 return false;
             }
-            
+
             return lr1.Start == lr2.Start && lr1.End == lr2.End;
         }
 
@@ -52,12 +61,12 @@ namespace watchCode.model
         {
             return End - Start + 1; //e.g. 2-5 = 4 lines
         }
-        
+
         public override string ToString()
         {
             return Start + "-" + End;
         }
-        
+
         /// <summary>
         /// tries to return a short representation of the rang
         /// </summary>
@@ -65,8 +74,16 @@ namespace watchCode.model
         public string ToShortString()
         {
             if (Start == End) return Start.ToString();
-            
+
             return Start + "-" + End;
         }
+
+        public static LineRange ReverseLineRange(LineRange lineRange, int linesCount)
+        {
+            return new LineRange(
+                linesCount - lineRange.End,
+                linesCount - lineRange.Start
+            );
+        } 
     }
 }

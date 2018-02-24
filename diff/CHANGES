@@ -1,0 +1,1 @@
+- removed all calls to HttpUtility (no included in dotnet core?? if so external dependecy --> not needed)

@@ -10,38 +10,41 @@ namespace watchCode.model
     public class Config
     {
         /// <summary>
-        /// the root dir to use
-        /// if not specified the current working dir is used
+        /// the absolute path to the source files (OR . for current working dir)
         /// </summary>
-        public string RootDir { get; set; }
-
-        public List<string> Dirs { get; set; }
-
-        public List<string> Files { get; set; }
-
-        public List<string> DirsToIgnore { get; set; }
-        public List<string> FilesToIgnore { get; set; }
+        public string SourceFilesDirAbsolutePath { get; set; }
 
         /// <summary>
-        /// true: check <see cref="Dirs"/> recursively
+        /// the absolute path to the doc files (OR . for current working dir)
         /// </summary>
-        public bool? RecursiveCheckDirs { get; set; }
+        public string DocFilesDirAbsolutePath { get; set; }
 
 
-        /// <summary>
-        /// true: reduce/compress watch expressions e.g. if one watch expression (line range) is included
-        /// in another, this is faster for evaulating but takes some time for finding the "duplicates"
-        /// false: use all found watch expressions 
-        /// </summary>
-        [Obsolete("not working")]
-        public bool? ReduceWatchExpressions { get; set; }
+        public List<string> DocDirsToIgnore { get; set; }
+        public List<string> DocFilesToIgnore { get; set; }
+
+        public List<string> SourceDirsToIgnore { get; set; }
+        public List<string> SourceFilesToIgnore { get; set; }
 
 
         /// <summary>
-        /// true: combines snapshots of the same file (code file) into one snapshot file
-        /// false: not
+        /// true: check dirs recursively
         /// </summary>
-        public bool? CombineSnapshotFiles { get; set; }
+        public bool? RecursiveCheckDocDirs { get; set; }
+
+//        /// <summary>
+//        /// true: check <see cref="SourceDirs"/> recursively
+//        /// </summary>
+//        public bool? RecursiveCheckSourceDirs { get; set; }
+
+
+//        /// <summary>
+//        /// true: reduce/compress watch expressions e.g. if one watch expression (line range) is included
+//        /// in another, this is faster for evaulating but takes some time for finding the "duplicates"
+//        /// false: use all found watch expressions 
+//        /// </summary>
+//        [Obsolete("not working")]
+//        public bool? ReduceWatchExpressions { get; set; }
 
 
         /// <summary>
@@ -51,14 +54,14 @@ namespace watchCode.model
         public string HashAlgorithmToUse { get; set; }
 
         /// <summary>
+        /// the dir name to store stuff (relative to <see cref="DocFilesDirAbsolutePath"/>)
+        /// </summary>
+        public string WatchCodeDirName { get; set; }
+
+        /// <summary>
         /// relative to <see cref="WatchCodeDirName"/>
         /// </summary>
         public string SnapshotDirName { get; set; }
-
-        /// <summary>
-        /// the dir to store stuff
-        /// </summary>
-        public string WatchCodeDirName { get; set; }
 
         /// <summary>
         /// true: only create a dump file containg all
@@ -74,14 +77,6 @@ namespace watchCode.model
 
         public bool? IgnoreHiddenFiles { get; set; }
 
-        
-        /// <summary>
-        /// use string builder instead of temp creating a file
-        /// 
-        /// also when using a temp file the original doc file will be deleted and the temp file will
-        /// be moved to the doc file location (so this removes all file attributes...) TODO maybe
-        /// </summary>
-        public bool? UseInMemoryStringBuilderFileForUpdateingDocs { get; set; }
 
         //--- not accessible via command line
 
@@ -95,9 +90,9 @@ namespace watchCode.model
         /// <summary>
         /// a dictionary with extensions and comments syntax to know which documention files we need to consider
         /// 
-        /// HIS is only for serialization use for real usage <see cref="DynamicConfig.KnownFileExtensionsWithoutExtension"/>
+        /// THIS is only for serialization use for real usage <see cref="DynamicConfig.KnownFileExtensionsWithoutExtension"/>
         /// </summary>
-        public Dictionary<string, List<(string start, string end)>> KnownFileExtensionsWithoutExtension { get; set; }
+        public Dictionary<string, List<CommentPattern>> KnownFileExtensionsWithoutExtension { get; set; }
 
 
         /// <summary>
@@ -122,62 +117,109 @@ namespace watchCode.model
                 }
             }
 
-            foreach (var filePath in config.Files)
+
+            foreach (var filePath in config.DocFilesToIgnore)
             {
-                var absolutePath = DynamicConfig.GetAbsoluteFilePath(filePath);
+                var absolutePath = DynamicConfig.GetAbsoluteDocFilePath(filePath);
                 if (!File.Exists(absolutePath))
-                    Logger.Warn($"ignoring file to check: {absolutePath} because it does not exist");
-            }
-            
-            foreach (var filePath in config.FilesToIgnore)
-            {
-                var absolutePath = DynamicConfig.GetAbsoluteFilePath(filePath);
-                if (!File.Exists(absolutePath))
-                    Logger.Warn($"ignoring file on ignore list: {absolutePath} because it does not exist");
-            }
-            
-            foreach (var filePath in config.Dirs)
-            {
-                var absolutePath = DynamicConfig.GetAbsoluteFilePath(filePath);
-                if (!Directory.Exists(absolutePath))
-                    Logger.Warn($"ignoring directory to check: {absolutePath} because it does not exist");
-            }
-            
-            foreach (var filePath in config.DirsToIgnore)
-            {
-                var absolutePath = DynamicConfig.GetAbsoluteFilePath(filePath);
-                if (!Directory.Exists(absolutePath))
-                    Logger.Warn($"ignoring directory on ignore list: {absolutePath} because it does not exist");
+                    Logger.Warn($"ignoring doc file on doc ignore list: {absolutePath} because it does not exist");
             }
 
-            
+
+            foreach (var filePath in config.DocDirsToIgnore)
+            {
+                var absolutePath = DynamicConfig.GetAbsoluteDocFilePath(filePath);
+                if (!Directory.Exists(absolutePath))
+                    Logger.Warn($"ignoring directory on doc ignore list: {absolutePath} because it does not exist");
+            }
+
+
+//            foreach (var filePath in config.SourceFiles)
+//            {
+//                var absolutePath = DynamicConfig.GetAbsoluteSourceFilePath(filePath);
+//                if (!File.Exists(absolutePath))
+//                    Logger.Warn($"ignoring source file to check: {absolutePath} because it does not exist");
+//            }
+
+            foreach (var filePath in config.SourceFilesToIgnore)
+            {
+                var absolutePath = DynamicConfig.GetAbsoluteSourceFilePath(filePath);
+                if (!File.Exists(absolutePath))
+                    Logger.Warn(
+                        $"ignoring source file on source ignore list: {absolutePath} because it does not exist");
+            }
+
+//            foreach (var filePath in config.SourceDirs)
+//            {
+//                var absolutePath = DynamicConfig.GetAbsoluteSourceFilePath(filePath);
+//                if (!Directory.Exists(absolutePath))
+//                    Logger.Warn($"ignoring directory to check: {absolutePath} because it does not exist");
+//            }
+
+            foreach (var filePath in config.SourceDirsToIgnore)
+            {
+                var absolutePath = DynamicConfig.GetAbsoluteSourceFilePath(filePath);
+                if (!Directory.Exists(absolutePath))
+                    Logger.Warn($"ignoring directory on source ignore list: {absolutePath} because it does not exist");
+            }
+
+
+            //config.KnownFileExtensionsWithoutExtension was only temp read from the config...
+            if (DynamicConfig.KnownFileExtensionsWithoutExtension.Count == 0)
+            {
+                Logger.Error($"the known extensions map was empty... thus  no files will be found");
+                return false;
+            }
+
+            foreach (var pair in DynamicConfig.KnownFileExtensionsWithoutExtension)
+            {
+                if (pair.Value.Count == 0)
+                {
+                    Logger.Error($"a known extensions map entry was empty, key: {pair.Key}");
+                    return false;
+                }
+            }
+
+            //config.InitWatchExpressionKeywords was only temp read from the config...
+            if (DynamicConfig.InitWatchExpressionKeywords.Count == 0)
+            {
+                Logger.Error($"the init watch expression keywords map was empty... thus no files will be found");
+                return false;
+            }
+
+
+            if (cmdArgs.MainAction == MainAction.UpdateExpression &&
+                (string.IsNullOrWhiteSpace(cmdArgs.UpdateDocsOldWatchExpression) ||
+                 string.IsNullOrWhiteSpace(cmdArgs.UpdateDocsNewWatchExpression)))
+            {
+                Logger.Error($"UpdateExpression some expr empty");
+                return false;
+            }
+
             return true;
         }
 
 
         public static Config DefaultConfig = new Config()
         {
-            Dirs = new List<string>()
-            {
-                "." //current dir
-            },
-            Files = new List<string>(),
-            DirsToIgnore = new List<string>(),
-            FilesToIgnore = new List<string>(),
+            DocFilesDirAbsolutePath = ".",
+            SourceFilesDirAbsolutePath = ".",
+
+            DocFilesToIgnore = new List<string>(),
+            DocDirsToIgnore = new List<string>(),
+            SourceDirsToIgnore = new List<string>(),
+            SourceFilesToIgnore = new List<string>(),
 
             WatchCodeDirName = "__watchCode__",
             SnapshotDirName = "__snapshots__",
             DumpWatchExpressionsFileName = "watchExpressions.json",
-            CreateWatchExpressionsDumpFile = true,
-            RecursiveCheckDirs = true,
-            ReduceWatchExpressions = false,
+            CreateWatchExpressionsDumpFile = false,
+            RecursiveCheckDocDirs = true,
+//            RecursiveCheckSourceDirs = true,
             IgnoreHiddenFiles = true,
-            CombineSnapshotFiles = true,
-            RootDir = "",
-            UseInMemoryStringBuilderFileForUpdateingDocs = true,
             HashAlgorithmToUse = HashHelper.DefaultHashAlgorithmName,
             InitWatchExpressionKeywords = new List<string>(),
-            KnownFileExtensionsWithoutExtension = new Dictionary<string, List<(string start, string end)>>(),
+            KnownFileExtensionsWithoutExtension = new Dictionary<string, List<CommentPattern>>()
         };
     }
 }

@@ -16,9 +16,14 @@ namespace watchCode.helpers
         /// <param name="config">the default config overwritten with the cmd args</param>
         public static void Bootstrap(CmdArgs cmdArgs, Config config)
         {
-            if (string.IsNullOrWhiteSpace(config.RootDir) == false)
+            if (string.IsNullOrWhiteSpace(config.DocFilesDirAbsolutePath) == false)
             {
-                DynamicConfig.AbsoluteRootDirPath = config.RootDir;
+                DynamicConfig.DocFilesDirAbsolutePath = config.DocFilesDirAbsolutePath;
+            }
+            
+            if (string.IsNullOrWhiteSpace(config.SourceFilesDirAbsolutePath) == false)
+            {
+                DynamicConfig.SourceFilesDirAbsolutePath = config.SourceFilesDirAbsolutePath;
             }
 
 
@@ -26,7 +31,7 @@ namespace watchCode.helpers
             if (string.IsNullOrWhiteSpace(cmdArgs.ConfigFileNameWithExtension) == false)
             {
                 string absoluteConfigFilePath =
-                    Path.Combine(DynamicConfig.AbsoluteRootDirPath, cmdArgs.ConfigFileNameWithExtension);
+                    Path.Combine(DynamicConfig.DocFilesDirAbsolutePath, cmdArgs.ConfigFileNameWithExtension);
 
                 try
                 {
@@ -49,11 +54,15 @@ namespace watchCode.helpers
                     Logger.Info($"using config at: {configFileInfo.FullName}");
 
                     if (readConfig.InitWatchExpressionKeywords != null)
+                    {
                         DynamicConfig.InitWatchExpressionKeywords = readConfig.InitWatchExpressionKeywords;
+                    }
 
                     if (readConfig.KnownFileExtensionsWithoutExtension != null)
+                    {
                         DynamicConfig.KnownFileExtensionsWithoutExtension =
                             readConfig.KnownFileExtensionsWithoutExtension;
+                    }
 
                     var properties = readConfig
                         .GetType()
@@ -90,10 +99,10 @@ namespace watchCode.helpers
 
             try
             {
-                var rootDirInfo = new DirectoryInfo(DynamicConfig.AbsoluteRootDirPath);
+                var rootDirInfo = new DirectoryInfo(DynamicConfig.DocFilesDirAbsolutePath);
                 if (rootDirInfo.Exists == false)
                 {
-                    Logger.Error($"root dir does not exist, path: {DynamicConfig.AbsoluteRootDirPath}, exitting");
+                    Logger.Error($"root doc dir does not exist, path: {DynamicConfig.DocFilesDirAbsolutePath}, exitting");
 
                     Environment.Exit(Program.ErrorReturnCode);
                     return;
@@ -102,17 +111,32 @@ namespace watchCode.helpers
             catch (Exception e)
             {
                 Logger.Error(
-                    $"error checking root dir, path: {DynamicConfig.AbsoluteRootDirPath}, error: {e.Message}, exitting");
+                    $"error checking doc root dir, path: {DynamicConfig.DocFilesDirAbsolutePath}, error: {e.Message}, exitting");
                 Environment.Exit(Program.ErrorReturnCode);
                 return;
             }
-
-            if (config.Files.Count == 0 && config.Dirs.Count == 0)
+            
+            try
             {
-                Logger.Error($"no file(s) nor dir(s) specified, returning");
-                Environment.Exit(Program.OkReturnCode);
+                var rootDirInfo = new DirectoryInfo(DynamicConfig.SourceFilesDirAbsolutePath);
+                if (rootDirInfo.Exists == false)
+                {
+                    Logger.Error($"root source dir does not exist, path: {DynamicConfig.SourceFilesDirAbsolutePath}, exitting");
+
+                    Environment.Exit(Program.ErrorReturnCode);
+                    return;
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(
+                    $"error checking source root dir, path: {DynamicConfig.SourceFilesDirAbsolutePath}, error: {e.Message}, exitting");
+                Environment.Exit(Program.ErrorReturnCode);
                 return;
             }
+            
+
+            
         }
     }
 }

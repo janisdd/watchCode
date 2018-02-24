@@ -23,16 +23,17 @@ namespace watchCode.model
         /// </summary>
         public MainAction MainAction { get; set; }
 
-        /// <summary>
-        /// true: updates the doc file watch expression if the watched lines change
-        /// but bottom to top searching found the right lines 
-        /// </summary>
-        public bool CompareAndUpdateDocs { get; set; }
+
+        public string UpdateDocsOldWatchExpression { get; set; }
+        public string UpdateDocsNewWatchExpression { get; set; }
+        
 
         /// <summary>
         /// writes the log inside the watch code dir
         /// </summary>
         public bool WriteLog { get; set; }
+
+        public string TargetWatchExpressions { get; set; }
 
 
         

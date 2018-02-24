@@ -7,8 +7,8 @@ namespace watchCode.model
         /// <summary>
         /// the source file path
         /// </summary>
-        public string WatchExpressionFilePath { get; set; }
-        
+        public string SourceFilePath { get; set; }
+
         /// <summary>
         /// the line range to watch
         /// or null to watch the whole file (for any changes)
@@ -19,46 +19,43 @@ namespace watchCode.model
         /// the file path (documentation file) where we found the watch expression
         /// relative the the root directory (so basically the same relative to as the watch expressions)
         /// </summary>
-        public string DocumentationFilePath { get; set; }
+        public string DocFilePath { get; set; }
 
         /// <summary>
         /// the lines where the watch expression was found
         /// </summary>
-        public LineRange DocumentationLineRange { get; set; }
+        public LineRange DocLineRange { get; set; }
+
+        /// <summary>
+        /// the used comment format (in case we need to rewrite)
+        /// </summary>
+        public CommentPattern UsedCommentFormat { get; set; }
 
         [Obsolete("do not use, only here because of json deserialization")]
         public WatchExpression()
         {
-            
         }
-        
 
-        public WatchExpression(string watchExpressionFilePath, LineRange lineRange, string documentationFilePath,
-            LineRange documentationLineRange)
+
+        public WatchExpression(string sourceFilePath, LineRange lineRange, string docFilePath,
+            LineRange docLineRange, CommentPattern usedCommentFormat)
         {
-            WatchExpressionFilePath = watchExpressionFilePath;
+            SourceFilePath = sourceFilePath;
             LineRange = lineRange;
-            DocumentationFilePath = documentationFilePath;
-            DocumentationLineRange = documentationLineRange;
+            DocFilePath = docFilePath;
+            DocLineRange = docLineRange;
+            UsedCommentFormat = usedCommentFormat;
         }
 
         /// <summary>
         /// used to determ the file name for the snapshot
         /// </summary>
         /// <returns></returns>
-        public string GetSnapshotFileNameWithoutExtension(bool combinedSnapshotFiles)
+        public string GetSnapshotFileNameWithoutExtension()
         {
-            if (combinedSnapshotFiles) return WatchExpressionFilePath;
-
-            if (LineRange == null)
-            {
-                return WatchExpressionFilePath;
-            }
-
-            return WatchExpressionFilePath + "_" + LineRange.Start + "-" + LineRange.End;
+            return SourceFilePath + "_" + LineRange.Start + "-" + LineRange.End;
         }
 
- 
 
         /// <summary>
         /// 
@@ -69,7 +66,7 @@ namespace watchCode.model
         public bool IncludesOther(WatchExpression y)
         {
             //it's the same file
-            if (WatchExpressionFilePath != y.WatchExpressionFilePath) return false;
+            if (SourceFilePath != y.SourceFilePath) return false;
 
             //if one matches the whole file then the other is not important
             if (LineRange == null) return true;
@@ -90,30 +87,16 @@ namespace watchCode.model
             return false;
         }
 
-        public override string ToString()
-        {
-            if (LineRange == null)
-            {
-                return WatchExpressionFilePath;
-            }
-            return WatchExpressionFilePath + ", " + LineRange.Start + "-" + LineRange.End;
-        }
-
         public string GetFullIdentifier()
         {
-            if (LineRange == null)
-            {
-                return DocumentationFilePath + ", " + DocumentationLineRange.Start + "-" + DocumentationLineRange.End +
-                       "_" + WatchExpressionFilePath;
-            }
-            return DocumentationFilePath + ", " + DocumentationLineRange.Start + "-" + DocumentationLineRange.End +
-                   "_" + WatchExpressionFilePath + ", " + LineRange.Start + "-" + LineRange.End;
+            return DocFilePath + ", " + DocLineRange.Start + "-" + DocLineRange.End +
+                   "_" + SourceFilePath + ", " + LineRange.Start + "-" + LineRange.End;
             ;
         }
 
         public string GetDocumentationLocation()
         {
-            return DocumentationFilePath + ", " + DocumentationLineRange.Start + "-" + DocumentationLineRange.End;
+            return DocFilePath + ", " + DocLineRange.Start + "-" + DocLineRange.End;
         }
 
 
@@ -128,14 +111,15 @@ namespace watchCode.model
             {
                 return false;
             }
+
             if (ReferenceEquals(w2, null))
             {
                 return false;
             }
 
-            return w1.DocumentationFilePath == w2.DocumentationFilePath &&
-                   w1.DocumentationLineRange == w2.DocumentationLineRange &&
-                   w1.WatchExpressionFilePath == w2.WatchExpressionFilePath &&
+            return w1.DocFilePath == w2.DocFilePath &&
+                   w1.DocLineRange == w2.DocLineRange &&
+                   w1.SourceFilePath == w2.SourceFilePath &&
                    w1.LineRange == w2.LineRange;
         }
 
@@ -146,7 +130,12 @@ namespace watchCode.model
 
         public string GetSourceFileLocation()
         {
-            return ToString();
+            if (LineRange == null)
+            {
+                return SourceFilePath;
+            }
+
+            return SourceFilePath + ", " + LineRange.Start + "-" + LineRange.End;
         }
     }
 }
