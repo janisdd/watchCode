@@ -89,14 +89,14 @@ namespace watchCode.model
 
         public string GetFullIdentifier()
         {
-            return DocFilePath + ", " + DocLineRange.Start + "-" + DocLineRange.End +
-                   "_" + SourceFilePath + ", " + LineRange.Start + "-" + LineRange.End;
+            return DocFilePath + ":" + DocLineRange.Start + "-" + DocLineRange.End +
+                   "_" + SourceFilePath + ":" + LineRange.Start + "-" + LineRange.End;
             ;
         }
 
         public string GetDocumentationLocation()
         {
-            return DocFilePath + ", " + DocLineRange.Start + "-" + DocLineRange.End;
+            return DocFilePath + ":" + DocLineRange.Start + "-" + DocLineRange.End;
         }
 
 
@@ -135,7 +135,7 @@ namespace watchCode.model
                 return SourceFilePath;
             }
 
-            return SourceFilePath + ", " + LineRange.Start + "-" + LineRange.End;
+            return SourceFilePath + ":" + LineRange.Start + "-" + LineRange.End;
         }
     }
 }

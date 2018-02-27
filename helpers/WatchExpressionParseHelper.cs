@@ -153,14 +153,14 @@ namespace watchCode.helpers
              * watch expression:
              * 
              * [path] - only check if file exists (must be a file, not a dir)
-             * [path] [int] - watch specific line inside file
-             * [path] [int] - [int] watch specific line inside file (int 1 must >= int 2),
+             * [path] : [int] - watch specific line inside file (NOT SUPPORTED)
+             * [path] : [int] - [int] watch specific line inside file (int 1 must >= int 2),
              *     if equal then the same as 1 int
              *
              * [watch expression] (, [watch expression])*
              *
              *
-             * currently one the simple format with single line range is supported
+             * currently one the simple format with single line range is supported (only 1 expression per comment)
              *
              * --- constraints ---
              * [int] must be >= 0
@@ -216,7 +216,7 @@ namespace watchCode.helpers
 
                 if (ch == '"' && containsEscape) containsEscape = false; //we matched the before "
 
-                if (ch == ' ')
+                if (ch == ':')
                 {
                     if (containsEscape) // " xxx "
                     {
@@ -252,29 +252,29 @@ namespace watchCode.helpers
                 return null;
             }
 
-            lineRang = ParseLineRange(filePath, fileInfo, true);
+//            lineRang = ParseLineRange(filePath, fileInfo, true);
 
-            if (lineRang != null)
-            {
-                //the path is a line range so take the file path of the previous watch expression 
-                if (previousWatchExpression == null)
-                {
-                    Logger.Warn(
-                        $"found invalid watch expression (only line range): {possibleWatchExpression} in file: {fileInfo.FullName}, skipping");
-                    return null;
-                }
+//            if (lineRang != null)
+//            {
+//                //the path is a line range so take the file path of the previous watch expression 
+//                if (previousWatchExpression == null)
+//                {
+//                    Logger.Warn(
+//                        $"found invalid watch expression (only line range): {possibleWatchExpression} in file: {fileInfo.FullName}, skipping");
+//                    return null;
+//                }
+//
+//                filePath = previousWatchExpression.SourceFilePath;
+//
+//                //make sure the doc file position is the same
+//                return new WatchExpression(filePath, lineRang, documentationFileRelativePath,
+//                    new LineRange(previousWatchExpression.DocLineRange.Start,
+//                        previousWatchExpression.DocLineRange.End),
+//                    foundCommentTuple.Clone()
+//                );
+//            }
 
-                filePath = previousWatchExpression.SourceFilePath;
-
-                //make sure the doc file position is the same
-                return new WatchExpression(filePath, lineRang, documentationFileRelativePath,
-                    new LineRange(previousWatchExpression.DocLineRange.Start,
-                        previousWatchExpression.DocLineRange.End),
-                    foundCommentTuple.Clone()
-                );
-            }
-
-            var lineRangString = possibleWatchExpression.Substring(builder.Length);
+            var lineRangString = possibleWatchExpression.Substring(builder.Length+1); //+1 for path:
 
             //watch expression can only be a file --> watch all lines
 
@@ -352,28 +352,29 @@ namespace watchCode.helpers
                 return new LineRange(start, end);
             }
 
-            //single value
-            int startAndEnd;
-
-            if (int.TryParse(possibleLineRang, out startAndEnd) == false)
-            {
-                if (suppressWarnings == false)
-                    Logger.Warn(
-                        $"found invalid line (< 0) range expression (start value): {possibleLineRang} in file: {fileInfo?.FullName}, skipping");
-
-                return null;
-            }
-
-            if (startAndEnd < 0)
-            {
-                if (suppressWarnings == false)
-                    Logger.Warn(
-                        $"found invalid (< 0) line range expression: {possibleLineRang} in file: {fileInfo?.FullName}, skipping");
-
-                return null;
-            }
-
-            return new LineRange(startAndEnd);
+//            //single value
+//            int startAndEnd;
+//
+//            if (int.TryParse(possibleLineRang, out startAndEnd) == false)
+//            {
+//                if (suppressWarnings == false)
+//                    Logger.Warn(
+//                        $"found invalid line (< 0) range expression (start value): {possibleLineRang} in file: {fileInfo?.FullName}, skipping");
+//
+//                return null;
+//            }
+//
+//            if (startAndEnd < 0)
+//            {
+//                if (suppressWarnings == false)
+//                    Logger.Warn(
+//                        $"found invalid (< 0) line range expression: {possibleLineRang} in file: {fileInfo?.FullName}, skipping");
+//
+//                return null;
+//            }
+//
+//            return new LineRange(startAndEnd);
+            return null;
         }
 
 
@@ -395,7 +396,7 @@ namespace watchCode.helpers
 
                 if (ch == '"' && containsEscape) containsEscape = false; //we matched the before "
 
-                if (ch == ' ')
+                if (ch == ':')
                 {
                     if (containsEscape) // " xxx "
                     {
@@ -432,7 +433,7 @@ namespace watchCode.helpers
             }
 
             
-            var lineRangString = possibleWatchExpression.Substring(builder.Length);
+            var lineRangString = possibleWatchExpression.Substring(builder.Length+1);
 
             //watch expression can only be a file --> watch all lines
 

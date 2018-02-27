@@ -199,7 +199,7 @@ namespace watchCode
 
                 foreach (var watchExpression in allWatchExpressions)
                 {
-                    string ident = watchExpression.SourceFilePath + " " + watchExpression.LineRange.ToString();
+                    string ident = watchExpression.GetSourceFileLocation();
 
                     if (cmdArgs.TargetWatchExpressions.Contains(ident)) targetWatchExpressions.Add(watchExpression);
                 }
@@ -213,7 +213,7 @@ namespace watchCode
 
                 foreach (var watchExpression in allWatchExpressions)
                 {
-                    string ident = watchExpression.SourceFilePath + " " + watchExpression.LineRange.ToString();
+                    string ident = watchExpression.GetSourceFileLocation();
 
 
                     if (ident == cmdArgs.UpdateDocsOldWatchExpression)

@@ -190,7 +190,7 @@ namespace watchCode.helpers
                         }
 
                         builder.Append(tuple.watchExpression.SourceFilePath);
-                        builder.Append(" ");
+                        builder.Append(":");
 
 
                         if (tuple.wasEqual && tuple.needToUpdateWatchExpression)

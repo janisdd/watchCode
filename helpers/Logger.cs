@@ -17,7 +17,7 @@ namespace watchCode.helpers
         public static ConsoleColor ErrorColor = ConsoleColor.DarkRed;
 
         public static ConsoleColor InsertedColor = ConsoleColor.DarkGreen;
-        public static ConsoleColor DeletedColor = ConsoleColor.DarkGreen;
+        public static ConsoleColor DeletedColor = ConsoleColor.DarkRed;
         public static ConsoleColor EqualColor = Console.ForegroundColor;
 
         private static Queue<string> logQueue = new Queue<string>();
